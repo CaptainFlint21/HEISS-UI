@@ -103,6 +103,8 @@ export function sanitizeRapid(input, profile, { referenceAssets, inpaint }) {
   const at = Number(input.rapidAt);
   // The smoothing step after the switch costs one full-size step: worth it on longer runs, where it is a few
   // percent; on a 4-8 step distill it eats most of the gain (measured, docs/rapid.md). The benchmark can force it.
+  // The node has its own, lower floor (SMOOTH_FROM_STEPS = 8 in heiss_rapid.py) for graphs wired by hand; this
+  // one decides for HEISS's runs.
   const steps = Number(input.steps) || Number(profile.defaults?.steps) || 0;
   const smooth = typeof input.rapidSmooth === "boolean" ? input.rapidSmooth : spec.smooth !== false && steps >= SMOOTH_FROM_STEPS;
   return { at: Number.isFinite(at) && at >= 0.3 && at <= 0.99 ? at : Math.round(clamp(spec.at + speedShift(input), 0.45, 0.95) * 100) / 100, smooth };

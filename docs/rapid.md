@@ -36,27 +36,31 @@ So the switch point is set **per family, from our own measurements**, rather tha
 
 ### 1. `ComfyUI-HEISS-UI-Nodes`: our node pack (new repo)
 
-Our own ComfyUI node pack, so that later HEISS features have a home. Its first node is **HEISS Rapid** (`HeissRapid`). It takes a `SAMPLER` and returns a `SAMPLER`, and goes between `KSamplerSelect` and `SamplerCustomAdvanced`.
+Our own ComfyUI node pack, so that later HEISS features have a home (`https://github.com/tristmeister/ComfyUI-HEISS-UI-Nodes`). It has two nodes: **HEISS Rapid** (`HeissRapid`, below) and **HEISS Rapid Guidance** (`HeissRapidGuidance`, see [Rapid Guidance](#rapid-guidance-2026-10-08)). HEISS Rapid takes a `SAMPLER` and returns a `SAMPLER`, and goes between `KSamplerSelect` and `SamplerCustomAdvanced`.
 
 **Inputs:**
 - `sampler`
-- `switch_at`: a noise level on the 0..1 flow scale; HEISS sets it per family
+- `switch_at`: a noise level on the 0..1 flow scale, 0.3 to 0.99; HEISS sets it per family
 - `scale`: start size, default 0.5
 - `min_full_steps`: default 2
+- `smooth_switch`: the extra step after the switch (see [The smooth switch](#the-smooth-switch-found-while-testing)), default on
 
 **Behaviour:**
 - Works out the model kind itself:
   - **flow** (`CONST`): state = (1−t)·x0 + t·ε
-  - **sigma** (`EPS` / `V_PREDICTION`, not EDM): state = x0 + σ·ε, compared on t = σ/(1+σ), rescaled by r
+  - **sigma** (`EPS`, `V_PREDICTION` and its subclass `EDM`, `COSMOS_RFLOW`): state = x0 + σ·ε, compared on t = σ/(1+σ), rescaled by r
 - Image (4D) and video (5D) latents. The DCT runs over the last two axes, and so does the padding.
 - The coarse size is rounded to the model's grid: even on both sides (UNets handle any size; DiTs patch in 2s).
 - It turns itself off, and says so, when there's:
   - an inpaint mask
+  - conditioning made at full size: an image concatenated to the latent (inpaint models, Fill, image to video, InstructPix2Pix), or masked or area conditioning
   - a run starting below noise 0.9 (img2img / upscale)
-  - an unknown model kind
+  - an unknown model kind (including `IMG_TO_IMG` samplings)
+  - a latent that isn't 4D or 5D, or is smaller than 8 on a side
   - too few steps
 - The last `min_full_steps` always run at full size. At most 80% of the steps run small.
-- It reports what it did to the HEISS socket (`heiss.rapid`: steps small and full, switch noise, or why it was skipped), so the app can show and record the real outcome.
+- At the switch it resets the model's caches that are keyed by latent size (Qwen-Image 2.1's prefix cache crashed on its second size).
+- It reports what it did over the socket (`heiss.rapid`: steps small and full, switch noise, or why it was skipped), only to the client that queued the run, so the app can show and record the real outcome. A run queued without a client gets the console line only.
 - Fresh noise is seeded from the run's seed, so a seed with Rapid on gives the same picture every time.
 - Has Python tests. The main one is an exact Gaussian-data denoiser: for x0 ~ N(0, P) in the DCT basis, E[x0 | x_t] is known in closed form. Sampling with Rapid on must reproduce the data's per-frequency variance just as sampling with it off does, for both flow and sigma models. A wrong rescale shows up as wrong variance, which is a sharper check than "looks fine".
 
@@ -73,7 +77,7 @@ Each family can carry `rapid: { at }`, and a variant can override or disable it 
 | Krea 2 (Turbo, Raw) | 0.7 | LC's tests: 2×, detail holds |
 | Z-Image | 0.7 | LC |
 | Flux.2 Klein / Dev | 0.7 | LC (1.3× at 4 steps) |
-| Qwen-Image | 0.7 | LC lists it; measure it |
+| Qwen-Image, Qwen-Image 2.1 | 0.7 | LC lists it; measure it |
 | Flux.1, Chroma | 0.85 to start | SwarmNeo: text breaks below about 0.94 at 40 steps. We measure with the text probe and choose. |
 | SDXL / Pony / Illustrious | 0.6 | LC's sweep (5 checkpoints, 4 samplers, 4 schedulers) |
 
@@ -86,42 +90,61 @@ Each family can carry `rapid: { at }`, and a variant can override or disable it 
 
 ### 3. Server
 
-- **`family-profiles.js`:** adds two capabilities:
-  - `capabilities.rapid`: the node is loaded and the family or variant supports it
-  - `capabilities.rapidInstall`: only the pack is missing
-- **`validation.js` (`sanitizeFamilyBody`):** `rapid` is kept only when:
-  - it was asked for
-  - the profile is ready
-  - the run is text-to-image: no inpaint, no start image or img2img below full denoise, no reference images (edit mode is unmeasured)
+- **`node-packs.js`:** the pack is pinned (`heiss`, both nodes listed). `update: true` brings an older installed copy to the pinned commit, so a copy with Rapid but without Rapid Guidance gets the update panel (`pack-installer.js`), unless someone has edited it.
+- **`family-profiles.js` (`rapidCapability`):** three capabilities:
+  - `capabilities.rapid`: `HeissRapid` is loaded and the family or variant supports it
+  - `capabilities.rapidGuidance`: `HeissRapidGuidance` is loaded and the family isn't a few-step variant
+  - `capabilities.rapidInstall`: either part only lacks the pack
 
-  `rapidAt` comes from the catalog.
+  Families with their own graph, own loaders or a runner never get it. A quantized checkpoint's own loader (NF4) doesn't get the half-size start, since its kernels are untested at other latent sizes; it can still use Rapid Guidance.
+- **`validation.js`:** `sanitizeRapid` and `sanitizeRapidGuidance` keep each part only when:
+  - it was asked for (the client's preference and seed rule)
+  - the profile has it ready
+  - the run is text-to-image: no inpaint, no start image, no reference images (edit mode is unmeasured)
+  - for Rapid Guidance also: CFG above 1 and a family with a negative pass
+
+  The body carries `rapid: { at, smooth }` and `rapidGuidance: { until }`:
+  - `at` and `until` come from the catalog, moved by the **speed choice** (`prefs.rapidSpeed`): Careful moves `at` up by 0.1 and `until` down by 0.1, Faster the other way. The results are clamped to 0.45–0.95 for `at` and 0.1–0.6 for `until`.
+  - `smooth` is on from 12 steps (`SMOOTH_FROM_STEPS`). The node has its own floor of 8 steps; below 12, HEISS already sends it off.
+  - `rapidAt`, `rapidSmooth` and `rapidCfgUntil` in the request override all of this. They're for the benchmark and for retries, and accept 0.3–0.99 for `at`.
 - **`family-graph.js`:**
   - `customSampler` wraps `KSamplerSelect` in `HeissRapid` when `body.rapid` is set.
-  - Families on a plain `KSampler` switch, only while Rapid is on, to the equivalent `RandomNoise + CFGGuider + BasicScheduler + KSamplerSelect → SamplerCustomAdvanced`.
-  - Own graphs (H3, Ideogram, Mage, Sana) never get it.
+  - `cfgGuider` uses `HeissRapidGuidance` in place of `CFGGuider` when `body.rapidGuidance` is set and CFG is above 1.
+  - Families on a plain `KSampler` switch, only while either part is on, to the equivalent `RandomNoise + CFGGuider + BasicScheduler + KSamplerSelect → SamplerCustomAdvanced`.
+  - Own graphs (H3, Ideogram, Mage, Sana), the video pair graph and imported workflows never get it.
+- **`jobs.js`:** catches the node's `heiss.rapid` message and keeps it on the run as `rapidReport`.
 - **`gallery-store.js` (`generationSettings`):**
-  - Records `rapid: true` on pictures made with it.
-  - If the node reports a skip, records `rapid: false` and the reason, so the details panel tells the truth.
-- **`generation-timing.js`:** Rapid runs are tagged, and estimates use runs made the same way (borrowing plain runs, scaled, until there are enough), so time estimates for runs with and without it don't get averaged together.
-- **`civitai.js`:** the A1111 parameters text gets `Rapid: on`.
+  - Records `rapid: true`, `rapidAt` and `rapidSmooth` on pictures where the node really ran, and `rapidGuidance: true` with `rapidCfgUntil`.
+  - If the node reports a skip, records `rapidSkipped` with the reason instead, so the details panel tells the truth.
+- **`generation-timing.js`:** Rapid runs are tagged (`rapid` only when the node really ran, `guidance`), and estimates use runs made the same way. Until there are enough, the other runs stand in, scaled by 0.75 (`RAPID_SHARE`), so time estimates for runs with and without it don't get averaged together.
+- **`civitai.js`:** the A1111 parameters text gets `HEISS Rapid: switch <at>` and `HEISS Rapid Guidance: CFG until <until>`.
+- **`index.js`:** `/api/rapid/status` says whether every node of the pack is loaded and, if not, returns the shared install plan.
 
 ### 4. Client
 
-- **Preference:** `prefs.rapid`, default on. Settings → Features gets a **Rapid** card with the switch. When the pack is missing, the card shows the shared `NodeInstall` panel.
-- **Seed rule** (client side, since only the client knows how a seed got there). The run uses Rapid when all three hold:
-  - `prefs.rapid` is on
-  - the model's capability is `"ready"`
+- **Preferences** (`constants.ts`, all default on):
+  - `prefs.rapidAll`: the master switch over both parts. The sidebar and phone rows switch this.
+  - `prefs.rapid`: the half-size start.
+  - `prefs.rapidGuidance`: Rapid Guidance.
+  - `prefs.rapidSpeed`: `careful`, `balanced` (default) or `faster`.
+- **Settings › Features › Rapid:** a drawer with the master switch and, under it, a switch per part, the Speed choice, a note on seeds, and the user's models that have it. When the pack is missing, it lists the models waiting for it and shows the shared install panel (`RapidSetup`). Opened from the sidebar's "Set up", it opens straight at the install.
+- **Seed rule** (`src/app/rapid.js`, `rapidState`; client side, since only the client knows how a seed got there). A part runs when all of these hold:
+  - `prefs.rapidAll` and that part's own preference are on
+  - the model's capability for that part is ready
   - either no seed is pinned, or the pinned seed is the one restored from a picture made with Rapid (`rapidSeed`)
+  - the run has no start image, reference images or inpaint mask
+  - for Rapid Guidance also: CFG above 1
 - **How that plays out:**
-  - "Use settings" on a Rapid picture restores its seed and sets `rapidSeed`, so the same picture comes back.
+  - "Use settings" on a Rapid picture restores its seed and sets `rapidSeed` (`rapidSeedFrom`), so the same picture comes back.
   - Typing your own seed, or reusing a picture made without Rapid, turns it off for those runs.
   - "Vary" clears the seed, so Rapid is back on.
-  - Undo (`restoreDraft`) carries `rapidSeed` too.
+  - Clearing the seed clears `rapidSeed`. Undo (`restoreDraft`) carries `rapidSeed` too.
 - **Composer:**
-  - The sidebar's advanced tab shows a small **Rapid** row with its state: "On", "Off: seed is fixed", "Not for this model", "Install".
-  - Phone: the same row in the phone's advanced settings.
-- **Retry:** reruns with the original run's `rapid`.
-- **Details panel:** a "Rapid" row on pictures made with it.
+  - The sidebar shows a small **Rapid** row (`RapidRow.tsx`) with the master switch and what the next run gets: "Half-size start and guidance", "Half-size start", "Lighter guidance", or why it's off ("Off while the seed is fixed", "Off with a start image", "Nothing to speed up at CFG 1", "Its parts are off in Settings"). When only the pack is missing it shows "Set up", which opens Settings › Features. It's hidden for models that can't use it.
+  - Phone: the same row as a switch in the phone's settings.
+  - The model menu shows a Rapid bolt on models that can use it, while Rapid is on.
+- **Retry** (`retry.ts`): reruns with the original run's parts and switch points (`rapidAt`, `rapidSmooth`, `rapidCfgUntil`).
+- **Details panel** (`format.ts`): a "Rapid" row ("On", or "Skipped:" and the node's reason) and a "Rapid Guidance" row.
 
 ### The smooth switch (found while testing)
 
@@ -135,7 +158,7 @@ Other approaches tried:
 - Re-spacing the remaining schedule: loses mid and high detail.
 - Easing back over 2–3 steps: only closes half the gap.
 
-HEISS uses the smooth switch by default. The benchmark's `fast` mode (no smoothing step) shows whether few-step models are better off without it.
+HEISS uses the smooth switch from 12 steps (`SMOOTH_FROM_STEPS` in validation.js); below that the extra step eats most of the gain (see the measurements). The node has its own floor of 8 steps for anyone wiring it by hand. The benchmark's `fast` mode (no smoothing step) compares the two.
 
 ### 5. Benchmark (`scripts/bench-rapid.mjs`)
 
@@ -150,8 +173,10 @@ HEISS uses the smooth switch by default. The benchmark's `fast` mode (no smoothi
 2. ✅ The node pack: the node, the Python tests (Gaussian oracle, plan, guards, 4D/5D, MPS), README with credits.
 3. ✅ HEISS server: pack entry, catalog values, capability, validation, graph, settings record, timing key, tests (`rapid`, `contract`).
 4. ✅ HEISS client: preference, settings card with install, seed rule (`src/app/rapid.js`, tested), sidebar and phone row, retry, details panel.
-5. Publish the pack repo, then pin its commit in `node-packs.js`.
+5. ✅ Publish the pack repo, then pin its commit in `node-packs.js`.
 6. Windows: install the pack, run on vs off, compare pictures, set each family's `at`, update MODELS.md and CHANGELOG.
+   - ✅ Krea 2 Turbo and Flux.2 Klein 9B measured on the 3070 (below); MODELS.md and CHANGELOG updated.
+   - Still to measure: Qwen-Image and Qwen-Image 2.1, Flux.1 and Chroma (their 0.85 is a starting guess), Z-Image, SDXL, and the Rapid Guidance cut-off.
 7. Video (Wan 2.2 pair), Anima and the other flow families, each after measuring.
 
 ## Measurements
