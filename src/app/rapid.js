@@ -58,3 +58,35 @@ export function rapidSeedFrom(settings, { vary = false } = {}) {
   const seed = String(settings.seed || "").trim();
   return /^\d+$/.test(seed) ? seed : "";
 }
+
+const SPEED_LABELS = { careful: "Careful", faster: "Faster" };
+const level = (value) => Number(value).toFixed(2).replace(/0$/, "");
+
+/**
+ * The details panel's Rapid section: whether each part ran on this picture and
+ * with which settings, as [label, value] rows (empty when Rapid had no part in it).
+ * @param {Record<string, unknown> | null | undefined} settings the picture's recorded settings
+ * @returns {Array<[string, string]>}
+ */
+export function rapidDetails(settings) {
+  const s = settings || {};
+  /** @type {Array<[string, string]>} */
+  const rows = [];
+  if (s.rapid) {
+    const small = Number(s.rapidSmallSteps);
+    const full = Number(s.rapidFullSteps);
+    // From the node's own report where there is one; older pictures only have what was asked for.
+    rows.push(["Half-size start", small > 0 && full >= 0 ? `${small} of ${small + full} steps at half size` : "On"]);
+    const at = Number(s.rapidSwitchNoise) || Number(s.rapidAt);
+    if (at > 0) rows.push(["Switched at", `noise ${level(at)}${s.rapidSwitchNoise && s.rapidAt && level(s.rapidSwitchNoise) !== level(s.rapidAt) ? ` (asked ${level(s.rapidAt)})` : ""}`]);
+    if (typeof s.rapidSmooth === "boolean") rows.push(["Smoothing step", s.rapidSmooth ? "On" : "Off"]);
+  } else if (s.rapidSkipped) {
+    rows.push(["Half-size start", `Skipped: ${s.rapidSkipped}`]);
+  }
+  if (s.rapidGuidance) {
+    const until = Number(s.rapidCfgUntil);
+    rows.push(["Lighter guidance", Number.isFinite(until) && s.rapidCfgUntil !== undefined && s.rapidCfgUntil !== null ? `CFG until noise ${level(until)}` : "On"]);
+  }
+  if (rows.length && (s.rapid || s.rapidGuidance)) rows.push(["Speed", SPEED_LABELS[String(s.rapidSpeed)] || "Balanced"]);
+  return rows;
+}

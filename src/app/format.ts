@@ -1,5 +1,6 @@
 import type React from 'react';
 import type { AspectPreset, GalleryItem, LoraSelection } from './types';
+import { rapidDetails } from './rapid.js';
 
 export function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
@@ -156,10 +157,10 @@ export function generationDetailEntries(item: GalleryItem): GenerationDetailSect
     add("Sampler", settings.sampler);
     add("Scheduler", settings.scheduler);
     add("Seed", settings.seed);
-    add("Rapid", settings.rapid ? "On" : settings.rapidSkipped ? `Skipped: ${settings.rapidSkipped}` : "");
-    add("Rapid Guidance", settings.rapidGuidance ? "On" : "");
     if (item.type === "image" && (item.referenceImage || settings.referenceImageName)) add("Denoise", settings.denoise);
   });
+  // HEISS Rapid: which parts ran and how (rapid.js).
+  section("Rapid", (add) => rapidDetails(settings).forEach(([label, value]) => add(label, value)));
   section(item.type === "video" ? "Video" : "Image", (add) => {
     add("Aspect", `${item.width || "?"}x${item.height || "?"}`);
     if (item.type === "image") {

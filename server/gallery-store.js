@@ -952,8 +952,11 @@ export function generationSettings(body) {
     promptPolicy: body.promptPolicy || null,
     // Made with HEISS Rapid; reusing it with its seed keeps Rapid on, so the same picture comes back.
     ...(body.rapid && body.rapidReport?.active !== false ? { rapid: true, rapidAt: body.rapid.at, rapidSmooth: body.rapid.smooth !== false } : {}),
+    // What the node reported it did: steps at half and full size, and the noise level where it really switched.
+    ...(body.rapid && body.rapidReport?.active && body.rapidReport.smallSteps ? { rapidSmallSteps: body.rapidReport.smallSteps, rapidFullSteps: body.rapidReport.fullSteps, ...(body.rapidReport.switchNoise ? { rapidSwitchNoise: body.rapidReport.switchNoise } : {}) } : {}),
     ...(body.rapid && body.rapidReport?.active === false ? { rapidSkipped: body.rapidReport.reason || "skipped" } : {}),
-    ...(body.rapidGuidance ? { rapidGuidance: true, rapidCfgUntil: body.rapidGuidance.until } : {})
+    ...(body.rapidGuidance ? { rapidGuidance: true, rapidCfgUntil: body.rapidGuidance.until } : {}),
+    ...((body.rapid || body.rapidGuidance) && body.rapidSpeed ? { rapidSpeed: body.rapidSpeed } : {})
   };
   const loras = Array.isArray(body.loras)
     ? body.loras.filter((item) => item?.enabled !== false && item?.name).slice(0, 8).map((item) => ({

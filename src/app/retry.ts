@@ -56,6 +56,7 @@ export function retryRequest(item: GalleryItem, options: RetryOptions = {}): Ret
     // The values it ran with, so a later catalog change doesn't change the retry.
     ...(settings.rapid ? { rapid: true, ...(settings.rapidAt ? { rapidAt: Number(settings.rapidAt) } : {}), ...(typeof settings.rapidSmooth === 'boolean' ? { rapidSmooth: settings.rapidSmooth } : {}) } : {}),
     ...(settings.rapidGuidance ? { rapidGuidance: true, ...(settings.rapidCfgUntil !== undefined ? { rapidCfgUntil: Number(settings.rapidCfgUntil) } : {}) } : {}),
+    ...((settings.rapid || settings.rapidGuidance) && settings.rapidSpeed ? { rapidSpeed: String(settings.rapidSpeed) } : {}),
     ...(options.tiledDecode ? { tiledDecode: true } : {})
   };
   const label = options.smaller ? 'Trying again smaller' : options.tiledDecode ? 'Trying again, decoding in tiles' : 'Trying again';

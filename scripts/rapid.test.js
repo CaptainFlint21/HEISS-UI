@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { rapidLabel, rapidSeedFrom, rapidState } from "../src/app/rapid.js";
+import { rapidDetails, rapidLabel, rapidSeedFrom, rapidState } from "../src/app/rapid.js";
 
 const ready = { capabilities: { rapid: true, rapidGuidance: true } };
 const on = { rapid: true };
@@ -42,4 +42,22 @@ test("Use settings remembers the seed of a Rapid picture only", () => {
   assert.equal(rapidSeedFrom({ rapidGuidance: true, seed: "77" }), "77");
   assert.equal(rapidSeedFrom({ rapid: true, seed: "Random" }), "");
   assert.equal(rapidSeedFrom({ rapid: true, seed: "77" }, { vary: true }), "");
+});
+
+test("the details panel says which parts of Rapid ran, and how", () => {
+  assert.deepEqual(rapidDetails({}), [], "nothing for a picture made without it");
+  assert.deepEqual(rapidDetails({ rapid: true, rapidAt: 0.7, rapidSmooth: false, rapidSmallSteps: 5, rapidFullSteps: 3, rapidSwitchNoise: 0.655, rapidGuidance: true, rapidCfgUntil: 0.4, rapidSpeed: "faster" }), [
+    ["Half-size start", "5 of 8 steps at half size"],
+    ["Switched at", "noise 0.66 (asked 0.7)"],
+    ["Smoothing step", "Off"],
+    ["Lighter guidance", "CFG until noise 0.4"],
+    ["Speed", "Faster"]
+  ]);
+  assert.deepEqual(rapidDetails({ rapid: true, rapidAt: 0.7, rapidSmooth: true }), [
+    ["Half-size start", "On"], ["Switched at", "noise 0.7"], ["Smoothing step", "On"], ["Speed", "Balanced"]
+  ], "an older picture without the node's report");
+  assert.deepEqual(rapidDetails({ rapidSkipped: "too few steps (1)" }), [["Half-size start", "Skipped: too few steps (1)"]]);
+  assert.deepEqual(rapidDetails({ rapidSkipped: "inpaint mask", rapidGuidance: true, rapidCfgUntil: 0.3 }), [
+    ["Half-size start", "Skipped: inpaint mask"], ["Lighter guidance", "CFG until noise 0.3"], ["Speed", "Balanced"]
+  ]);
 });

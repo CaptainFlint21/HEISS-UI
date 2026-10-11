@@ -48,13 +48,14 @@ async function run(id, body, report) {
 const types = (graph) => Object.values(graph).map((node) => node.class_type);
 
 test("a Rapid run sends both nodes and records that Rapid made the picture", async () => {
-  const { prompt, item } = await run("rapid-on", request(), { active: true, small_steps: 11, full_steps: 14 });
+  const { prompt, item } = await run("rapid-on", request(), { active: true, small_steps: 11, full_steps: 14, switch_noise: 0.6912 });
   assert.ok(types(prompt.prompt).includes("HeissRapid"));
   assert.ok(types(prompt.prompt).includes("HeissRapidGuidance"));
   assert.ok(!types(prompt.prompt).includes("KSampler"));
   assert.equal(item.status, "done");
   assert.equal(item.settings.rapid, true);
   assert.equal(item.settings.rapidGuidance, true);
+  assert.deepEqual([item.settings.rapidSmallSteps, item.settings.rapidFullSteps, item.settings.rapidSwitchNoise], [11, 14, 0.6912], "the node's own report reaches the record");
 });
 
 test("when Rapid steps aside, the picture says so and why", { skip: typeof WebSocket !== "function" }, async () => {

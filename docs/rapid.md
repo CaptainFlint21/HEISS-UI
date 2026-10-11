@@ -114,7 +114,7 @@ Each family can carry `rapid: { at }`, and a variant can override or disable it 
   - Own graphs (H3, Ideogram, Mage, Sana), the video pair graph and imported workflows never get it.
 - **`jobs.js`:** catches the node's `heiss.rapid` message and keeps it on the run as `rapidReport`.
 - **`gallery-store.js` (`generationSettings`):**
-  - Records `rapid: true`, `rapidAt` and `rapidSmooth` on pictures where the node really ran, and `rapidGuidance: true` with `rapidCfgUntil`.
+  - Records `rapid: true`, `rapidAt` and `rapidSmooth` on pictures where the node really ran, plus what the node reported: `rapidSmallSteps`, `rapidFullSteps` and `rapidSwitchNoise` (where it really switched). Rapid Guidance records `rapidGuidance: true` with `rapidCfgUntil`. A speed choice other than Balanced is kept as `rapidSpeed` (passed through by `validation.js`).
   - If the node reports a skip, records `rapidSkipped` with the reason instead, so the details panel tells the truth.
 - **`generation-timing.js`:** Rapid runs are tagged (`rapid` only when the node really ran, `guidance`), and estimates use runs made the same way. Until there are enough, the other runs stand in, scaled by 0.75 (`RAPID_SHARE`), so time estimates for runs with and without it don't get averaged together.
 - **`civitai.js`:** the A1111 parameters text gets `HEISS Rapid: switch <at>` and `HEISS Rapid Guidance: CFG until <until>`.
@@ -143,8 +143,8 @@ Each family can carry `rapid: { at }`, and a variant can override or disable it 
   - The sidebar shows a small **Rapid** row (`RapidRow.tsx`) with the master switch and what the next run gets: "Half-size start and guidance", "Half-size start", "Lighter guidance", or why it's off ("Off while the seed is fixed", "Off with a start image", "Nothing to speed up at CFG 1", "Its parts are off in Settings"). When only the pack is missing it shows "Set up", which opens Settings › Features. It's hidden for models that can't use it.
   - Phone: the same row as a switch in the phone's settings.
   - The model menu shows a Rapid bolt on models that can use it, while Rapid is on.
-- **Retry** (`retry.ts`): reruns with the original run's parts and switch points (`rapidAt`, `rapidSmooth`, `rapidCfgUntil`).
-- **Details panel** (`format.ts`): a "Rapid" row ("On", or "Skipped:" and the node's reason) and a "Rapid Guidance" row.
+- **Retry** (`retry.ts`): reruns with the original run's parts, switch points and speed (`rapidAt`, `rapidSmooth`, `rapidCfgUntil`, `rapidSpeed`).
+- **Details panel** (`rapidDetails` in `rapid.js`, shown by `format.ts`): its own **Rapid** section, only on pictures Rapid had a part in. Half-size start ("5 of 8 steps at half size", or "Skipped:" and the node's reason), Switched at (the noise level the node reported, with the asked one when they differ), Smoothing step, Lighter guidance ("CFG until noise 0.3") and Speed. Older pictures without the node's report show "On" and the asked switch point.
 
 ### The smooth switch (found while testing)
 

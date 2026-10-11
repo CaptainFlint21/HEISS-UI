@@ -115,6 +115,10 @@ test("a picture records that Rapid made it, or why it stepped aside", () => {
   assert.equal(skipped.rapid, undefined);
   assert.equal(skipped.rapidSkipped, "too few steps (1)");
   assert.equal(generationSettings({ kind: "image", seed: "123" }).rapid, undefined);
+  const reported = generationSettings({ ...body, rapidSpeed: "careful", rapidReport: { active: true, smallSteps: 5, fullSteps: 3, switchNoise: 0.655 } });
+  assert.deepEqual([reported.rapidSmallSteps, reported.rapidFullSteps, reported.rapidSwitchNoise, reported.rapidSpeed], [5, 3, 0.655, "careful"]);
+  assert.equal(skipped.rapidSmallSteps, undefined);
+  assert.equal(generationSettings({ kind: "image", seed: "123", rapidSpeed: "faster" }).rapidSpeed, undefined, "no speed without Rapid");
 });
 
 test("time estimates keep Rapid runs apart while there are enough of each", () => {
