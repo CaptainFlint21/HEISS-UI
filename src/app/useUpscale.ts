@@ -4,6 +4,7 @@ import type { AutoUpscale, GalleryItem, Preferences, UpscaleInstall, UpscaleQual
 import type { ShowToast } from './toast';
 import { mediaUrl } from './mediaUrl';
 import { formatLeft, useRunClock } from './GenerationProgress';
+import { loadRtxStatus, rtxOffered } from './rtx';
 
 /** The gallery keeps the original as the record; only the view swaps. */
 export function upscaleDisplayUrl(item: GalleryItem) {
@@ -23,9 +24,14 @@ export function upscaledWithRun(item: GalleryItem) {
   return Boolean(item.upscale?.withRun && item.upscale.url);
 }
 
-export function canUpscaleItem(item: GalleryItem) {
+/**
+ * Pictures upscale with SeedVR2 anywhere; videos with RTX, on an NVIDIA card
+ * (rtx.ts). `videos` is passed by components that subscribe to that answer.
+ */
+export function canUpscaleItem(item: GalleryItem, videos = rtxOffered()) {
+  const kind = item.type === "image" || (item.type === "video" && videos && !item.privateVault);
   // Images added from another folder stay where they are, so there is nothing to upscale into.
-  return item.status === "done" && item.type === "image" && !item.vaultLocked && !item.library && Boolean(item.url) && !upscaledWithRun(item);
+  return item.status === "done" && kind && !item.vaultLocked && !item.library && Boolean(item.url) && !upscaledWithRun(item);
 }
 
 /**
@@ -61,7 +67,7 @@ export function upscaleTooltip(item: GalleryItem, leftMs: number | null = null) 
   }
   if (state?.status === "error") return `${state.error || "Upscale failed"}. Click to try again`;
   if (state?.url) return item.upscaleActive ? "Showing the upscale · click for the original" : "Showing the original · click for the upscale";
-  return "Smart upscale";
+  return item.type === "video" ? "RTX upscale" : "Smart upscale";
 }
 
 /** Decimal units, like the Finder and every model setup panel, so one file never shows two sizes. */
@@ -104,7 +110,9 @@ export type UpscaleNotice = { title: string; message: string; reason: string };
 
 const noticeTitles: Record<string, string> = {
   missing: "The image file is missing",
-  video: "Only images can be upscaled",
+  video: "Only pictures and videos can be upscaled",
+  rtx: "RTX upscaling isn’t set up",
+  hidden: "Not for Hidden videos yet",
   unfinished: "Still rendering",
   source: "Couldn’t read the original",
   switch: "Couldn’t switch versions",
@@ -364,10 +372,12 @@ export function useUpscale({ gallery, prefs, showToast, loadGalleryDelta, patchG
       ? { ...current, upscale: { ...before, status: "running", jobId: undefined, quality, faceDetail: Boolean(prefs.upscaleFaceDetail), progress: null, error: undefined } }
       : current);
     try {
+      // A video goes to RTX at the composer's video tier (2K unless 4K is picked), smoothed when asked.
+      const video = item.type === "video" ? { tier: prefs.videoUpscale === "4k" ? "4k" : "2k", smooth: Boolean(prefs.rtxSmooth) } : {};
       await apiJson("/api/upscale", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ galleryItemId: item.id, quality, faceDetail: Boolean(prefs.upscaleFaceDetail) })
+        body: JSON.stringify({ galleryItemId: item.id, quality, faceDetail: Boolean(prefs.upscaleFaceDetail), ...video })
       });
       loadGalleryDelta();
     } catch (error) {
@@ -376,11 +386,13 @@ export function useUpscale({ gallery, prefs, showToast, loadGalleryDelta, patchG
       patchGalleryItems((current) => current.id === item.id && current.upscale?.status === "running" && !current.upscale.jobId
         ? { ...current, upscale: before }
         : current);
-      setNotice(item.id, upscaleNoticeFrom(error));
+      const notice = upscaleNoticeFrom(error);
+      setNotice(item.id, notice.reason === "rtx" ? { ...notice, message: `${notice.message} Set it up in Settings › Features › Smart upscale.` } : notice);
+      if (notice.reason === "rtx") loadRtxStatus({ fresh: true });
     } finally {
       startingIds.current.delete(item.id);
     }
-  }, [loadGalleryDelta, patchGalleryItems, prefs.upscaleFaceDetail, prefs.upscaleQuality, setNotice]);
+  }, [loadGalleryDelta, patchGalleryItems, prefs.rtxSmooth, prefs.upscaleFaceDetail, prefs.upscaleQuality, prefs.videoUpscale, setNotice]);
 
   // Setup finished for an image that was waiting: hold the ready moment for a
   // beat, then close and do what the click asked for in the first place.
@@ -400,6 +412,11 @@ export function useUpscale({ gallery, prefs, showToast, loadGalleryDelta, patchG
 
   const upscaleItem = useCallback(async (item: GalleryItem) => {
     if (!canUpscaleItem(item) || item.upscale?.status === "running") return;
+    // Videos skip SeedVR2's setup: the server checks RTX and says what's missing as a notice.
+    if (item.type === "video") {
+      await runUpscale(item);
+      return;
+    }
     // Known ready: start at once. The server still checks, and a no comes back as a notice.
     if (status?.ready) {
       await runUpscale(item);

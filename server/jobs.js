@@ -490,7 +490,8 @@ async function runJob(id, body, { prepare = null } = {}) {
     timing.timer = new RunTimer(prompt, { endNodes: pairs.map((pair) => pair.base) });
     if (embed) {
       // Its upscale is part of the run's time: learned from every SeedVR2 upscale here (upscale-timing.js).
-      const work = upscaleWork({ width: embed.plan?.estimatedWidth, height: embed.plan?.estimatedHeight, count: (Number(body.count) || 1) * pairs.length });
+      // A video's upscale (rtx.js) works on every frame: its plan says how many.
+      const work = upscaleWork({ width: embed.plan?.estimatedWidth, height: embed.plan?.estimatedHeight, count: (Number(body.count) || 1) * pairs.length * (embed.plan?.frames || 1) });
       const learn = { quality: embed.quality, model: embed.plan?.model || "", faceDetail: Boolean(embed.faceDetail), work };
       timing.upscale = { estimate: upscaleEstimate(learn), learn, startAt: null, endAt: null };
     }

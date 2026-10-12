@@ -10,6 +10,7 @@ import { GenerationProgress } from './GenerationProgress';
 import { FailureTile } from './GenerationFailure';
 import type { GalleryItem } from './types';
 import { canUpscaleItem, upscaleDisplayUrl, upscaledWithRun, upscaleTooltip, useUpscaleClock } from './useUpscale';
+import { useRtxOffered } from './rtx';
 import { UpscaleArrow } from './UpscaleArrow';
 import { UpscaleNoticePopover } from './UpscaleNotice';
 import { useHiddenActions } from './hiddenContext';
@@ -100,6 +101,7 @@ const tileEnterTransition = {
 
 function GalleryTileComponent({ cancelJob, copyPromptAndToast, deleteItem, formatElapsed, height, item, onUpscale, onCancelUpscale = () => {}, openItem, smartUpscale = false, titleFromPrompt, upscaleBusy = false, upscaleNotice, onDismissUpscaleNotice, width }: GalleryTileProps) {
   const mountedRef = useRef(false);
+  const rtxVideos = useRtxOffered();
   const prefersReducedMotion = useReducedMotion();
   const isEntering = !mountedRef.current && (Date.now() - Date.parse(item.createdAt || "")) < 2000;
   useEffect(() => { mountedRef.current = true; }, []);
@@ -178,7 +180,7 @@ function GalleryTileComponent({ cancelJob, copyPromptAndToast, deleteItem, forma
           inside a button is invalid and unreachable by keyboard. */}
       <div ref={overlayRef} className={cn("tile-overlay", menuOpen && "is-menu-open", phoneTiles && "is-phone")}>
         {selecting && selectable ? <span className={cn("tile-check", isSelected && "is-on")} aria-hidden="true">{isSelected ? <Check size={16} strokeWidth={3} /> : null}</span> : null}
-        {smartUpscale && onUpscale && canUpscaleItem(item) ? <UpscaleButton item={item} busy={upscaleBusy} onUpscale={onUpscale} onCancelUpscale={onCancelUpscale} held={Boolean(upscaleNotice)} /> : null}
+        {smartUpscale && onUpscale && canUpscaleItem(item, rtxVideos) ? <UpscaleButton item={item} busy={upscaleBusy} onUpscale={onUpscale} onCancelUpscale={onCancelUpscale} held={Boolean(upscaleNotice)} /> : null}
         {upscaleNotice && onDismissUpscaleNotice ? <UpscaleNoticePopover notice={upscaleNotice} placement="tile" onDismiss={() => onDismissUpscaleNotice(item.id)} /> : null}
         {item.status === "pending" ? <Tip content={item.progress?.upscaling ? "Stop the upscale · the picture stays" : "Stop generation"}><button type="button" className="tile-action" onClick={() => cancelJob(item.jobId)}>Stop</button></Tip> : null}
         {item.status !== "pending" ? (

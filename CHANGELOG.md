@@ -22,6 +22,13 @@ version opens with a `> ` summary line, which the update pill shows.
   Rapid picture keeps it on and brings the same picture back. Based on SPEED
   (Xiao et al., 2026), with an extra step after the switch that keeps the
   picture's contrast true to a run without it.
+- **RTX video upscale (NVIDIA RTX cards).** Videos get an upscale arrow, and
+  video models get 2K and 4K in the size menu: NVIDIA's RTX Video Super
+  Resolution sharpens and cleans every frame in seconds, and keeps the sound.
+  On an RTX 40-series or newer, "Smoother video" also doubles the frame rate
+  at the same length. The original is always kept. Set it up in Settings ›
+  Features › Smart upscale: the HEISS UI Nodes, then NVIDIA's package (about
+  0.5 GB). Not shown on Macs or AMD cards, and not for Hidden videos yet.
 
 ## [0.17.0] - 2026-10-09
 

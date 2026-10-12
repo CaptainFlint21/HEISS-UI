@@ -308,14 +308,20 @@ const upscaleTabs: { value: AutoUpscale; label: string }[] = [
   { value: "4k", label: "4K" }
 ];
 
-/** Smart upscale's tabs, on top of the size menu: what every new image becomes once it finishes. */
-function SmartUpscaleTabs({ value, onChange }: { value: AutoUpscale; onChange: (value: AutoUpscale) => void }) {
+const upscaleTabCopy = {
+  smart: { title: "Smart upscale", tip: "Upscales every new image with SeedVR2 as it finishes, rebuilding fine detail instead of stretching pixels. Takes a little longer; the original is kept." },
+  rtx: { title: "RTX upscale", tip: "Upscales every new video with NVIDIA RTX Video Super Resolution as it finishes, in seconds. It sharpens and cleans what’s there rather than drawing new detail. The original is kept." }
+};
+
+/** The upscale tabs, on top of the size menu: what every new image (Smart upscale) or video (RTX) becomes once it finishes. */
+function SmartUpscaleTabs({ value, onChange, kind = "smart" }: { value: AutoUpscale; onChange: (value: AutoUpscale) => void; kind?: "smart" | "rtx" }) {
   const index = Math.max(0, upscaleTabs.findIndex((tab) => tab.value === value));
+  const copy = upscaleTabCopy[kind];
   return (
     <div className="aspect-upscale">
       <div className="aspect-upscale-head">
-        <span id="aspect-upscale-label">Smart upscale</span>
-        <InfoTip side="top" content="Upscales every new image with SeedVR2 as it finishes, rebuilding fine detail instead of stretching pixels. Takes a little longer; the original is kept." />
+        <span id="aspect-upscale-label">{copy.title}</span>
+        <InfoTip side="top" content={copy.tip} />
       </div>
       <div className="aspect-upscale-tabs" role="radiogroup" aria-labelledby="aspect-upscale-label" style={{ "--tab-index": index } as React.CSSProperties} onKeyDown={(event) => {
         if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
@@ -343,7 +349,7 @@ function SmartUpscaleTabs({ value, onChange }: { value: AutoUpscale; onChange: (
   );
 }
 
-export function AspectPicker({ value, options, onChange, currentSize, defaultSize, density = "full", upscale = "none", onUpscaleChange }: { value: string; options: AspectPreset[]; onChange: (value: string) => void; currentSize: string; defaultSize: string; density?: ControlDensity; upscale?: AutoUpscale; onUpscaleChange?: (value: AutoUpscale) => void }) {
+export function AspectPicker({ value, options, onChange, currentSize, defaultSize, density = "full", upscale = "none", upscaleKind = "smart", onUpscaleChange }: { value: string; options: AspectPreset[]; onChange: (value: string) => void; currentSize: string; defaultSize: string; density?: ControlDensity; upscale?: AutoUpscale; upscaleKind?: "smart" | "rtx"; onUpscaleChange?: (value: AutoUpscale) => void }) {
   const [open, setOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement | null>(null);
   const selected = options.find((item) => item.value === value);
@@ -363,7 +369,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
   }, [open]);
   return (
     <div className={cn("aspect-picker", density !== "full" && `is-density-${density}`)} ref={pickerRef} data-open-surface={open || undefined}>
-      <Tip content={`${density === "full" ? "Aspect ratio" : `Aspect ratio: ${label}`}${upscaleLabel ? `, smart upscale to ${upscaleLabel}` : ""}`}><button ref={triggerRef} type="button" data-open-trigger className="aspect-trigger" aria-label={`Aspect ratio: ${label}${upscaleLabel ? `, smart upscale to ${upscaleLabel}` : ""}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((next) => !next)}>
+      <Tip content={`${density === "full" ? "Aspect ratio" : `Aspect ratio: ${label}`}${upscaleLabel ? `, ${upscaleKind === "rtx" ? "RTX" : "smart"} upscale to ${upscaleLabel}` : ""}`}><button ref={triggerRef} type="button" data-open-trigger className="aspect-trigger" aria-label={`Aspect ratio: ${label}${upscaleLabel ? `, ${upscaleKind === "rtx" ? "RTX" : "smart"} upscale to ${upscaleLabel}` : ""}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((next) => !next)}>
           {/* The tag sits on the icon's corner, so turning Smart upscale on never changes the button's width. */}
           <span className="aspect-shape-slot">
             {selected ? <span className="aspect-shape" style={aspectIconStyle(selected)} /> : <span className={cn("aspect-shape", isDefault ? "default" : "custom")} />}
@@ -374,7 +380,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
         </button></Tip>
       {open ? (
         <div className="aspect-menu" data-open-surface>
-        {onUpscaleChange ? <SmartUpscaleTabs value={upscale} onChange={onUpscaleChange} /> : null}
+        {onUpscaleChange ? <SmartUpscaleTabs value={upscale} onChange={onUpscaleChange} kind={upscaleKind} /> : null}
         <div className="aspect-list" role="listbox" aria-label="Aspect ratio" onKeyDown={(event) => {
           // Up and down move between options; the menu opens with focus on the chosen one.
           if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;

@@ -65,7 +65,8 @@ export function packInstallPlan(pack, root = comfyRootDir(), platform = process.
   const customNodes = root ? paths.join(root, "custom_nodes") : "";
   const python = comfyPython(root, platform);
   const cloned = Boolean(customNodes) && fs.existsSync(paths.join(customNodes, pack.folder));
-  const requirements = paths.join(pack.folder, "requirements.txt");
+  const requirements = paths.join(pack.folder, pack.requirements || "requirements.txt");
+  const index = pack.pipIndex ? ` --extra-index-url ${pack.pipIndex}` : "";
   const folder = customNodes || paths.join("ComfyUI", "custom_nodes");
   const clone = `git clone ${pack.repository}`;
   // The reviewed commit (node-packs.js), the same one the one-click install takes.
@@ -77,7 +78,7 @@ export function packInstallPlan(pack, root = comfyRootDir(), platform = process.
   if (win) {
     const exe = python ? `"${python}"` : "python";
     const embedded = isEmbeddedPython(python);
-    const pip = `${exe} ${pipArgs(python).join(" ")} install -r ${requirements}`;
+    const pip = `${exe} ${pipArgs(python).join(" ")} install -r ${requirements}${index}`;
     // -LiteralPath: a plain Set-Location reads [ ] in a folder name as wildcards.
     const steps = [`Set-Location -LiteralPath "${folder}"`, ...fetchSteps, ...(embedded ? ['$env:PYTHONNOUSERSITE = "1"'] : []), `${python ? "& " : ""}${pip}`];
     commands.push({ shell: "powershell", label: "PowerShell", command: steps.map((step, i) => (i ? `if ($?) { ${step} }` : step)).join("; ") });
@@ -85,7 +86,7 @@ export function packInstallPlan(pack, root = comfyRootDir(), platform = process.
     commands.push({ shell: "cmd", label: "Command Prompt", command: [`cd /d "${folder}"`, ...fetchSteps, ...(embedded ? ['set "PYTHONNOUSERSITE=1"'] : []), pip].join(" && ") });
   } else {
     const exe = python ? `"${python}"` : "python3";
-    commands.push({ shell: "sh", label: "Terminal", command: [`cd "${folder}"`, ...fetchSteps, `${exe} -m pip install -r ${requirements}`].join(" && ") });
+    commands.push({ shell: "sh", label: "Terminal", command: [`cd "${folder}"`, ...fetchSteps, `${exe} -m pip install -r ${requirements}${index}`].join(" && ") });
   }
   return {
     exact: Boolean(customNodes && python),

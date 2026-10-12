@@ -7,6 +7,7 @@ import { cn, aspectIconStyle } from './format';
 import { familyLabel, setupNote } from './components';
 import { downloadUrl } from './GalleryTile';
 import { autoUpscaleTiers, canUpscaleItem, shortLeft, upscaledWithRun, upscaleLeftLine, upscaleTooltip, useUpscaleClock } from './useUpscale';
+import { useRtxOffered } from './rtx';
 import { UpscaleArrow } from './UpscaleArrow';
 import { ReferenceSlots } from './ReferenceMediaPicker';
 import { haptic, HapticTarget } from './phoneControls';
@@ -271,6 +272,7 @@ function UpscaleBarButton({ item, actions }: { item: GalleryItem; actions: Phone
 
 /** What a long press on a tile offers, as one sheet of big labelled rows. */
 export function ItemActionSheet({ item, onClose, actions, onSelect }: { item: GalleryItem | null; onClose: () => void; actions: PhoneItemActions; onSelect?: (item: GalleryItem) => void }) {
+  const rtxVideos = useRtxOffered();
   React.useEffect(() => { prefetchShare(item); }, [item]);
   const done = item?.status === 'done' && Boolean(item?.url);
   const run = (action: () => void) => { onClose(); action(); };
@@ -283,7 +285,7 @@ export function ItemActionSheet({ item, onClose, actions, onSelect }: { item: Ga
               {canShareFiles ? <Share size={20} /> : <Download size={20} />}<span>{canShareFiles ? 'Share or save' : 'Save'}</span>
             </button>
           ) : null}
-          {actions.smartUpscale && canUpscaleItem(item) ? <UpscaleSheetRow item={item} actions={actions} run={run} /> : null}
+          {actions.smartUpscale && canUpscaleItem(item, rtxVideos) ? <UpscaleSheetRow item={item} actions={actions} run={run} /> : null}
           {canStar(item) ? (
             <button type="button" className={cn('phone-row', item.favorite && 'is-starred')} onClick={() => run(() => { haptic('tap'); actions.star(item); })}>
               <Star size={20} fill={item.favorite ? 'currentColor' : 'none'} /><span>{item.favorite ? 'Unstar' : 'Star'}</span><HapticTarget />
@@ -306,12 +308,13 @@ export function ItemActionSheet({ item, onClose, actions, onSelect }: { item: Ga
 
 /** The viewer's bottom bar on a phone: five big labelled actions and Info. */
 export function PhoneViewerBar({ item, actions, showDetails, onToggleDetails, compareOpen, onToggleCompare }: { item: GalleryItem; actions: PhoneItemActions; showDetails: boolean; onToggleDetails: () => void; compareOpen: boolean; onToggleCompare: () => void }) {
+  const rtxVideos = useRtxOffered();
   React.useEffect(() => { prefetchShare(item); }, [item]);
   const done = item.status === 'done' && Boolean(item.url);
   return (
     <nav className="viewer-phone-bar" aria-label="Image actions">
       {done ? <button type="button" onClick={() => shareItem(item, actions.showToast)}>{canShareFiles ? <Share size={21} /> : <Download size={21} />}<span>{canShareFiles ? 'Share' : 'Save'}</span></button> : null}
-      {actions.smartUpscale && canUpscaleItem(item) ? <UpscaleBarButton item={item} actions={actions} /> : null}
+      {actions.smartUpscale && canUpscaleItem(item, rtxVideos) ? <UpscaleBarButton item={item} actions={actions} /> : null}
       {item.upscale?.url && !upscaledWithRun(item) ? <button type="button" className={cn(compareOpen && 'is-on')} aria-pressed={compareOpen} onClick={() => { haptic('tap'); onToggleCompare(); }}><Columns2 size={21} /><span>Compare</span><HapticTarget /></button> : null}
       {item.prompt ? <button type="button" onClick={() => actions.reuse(item)}><Wand2 size={21} /><span>Reuse</span></button> : null}
       {canStar(item) ? (

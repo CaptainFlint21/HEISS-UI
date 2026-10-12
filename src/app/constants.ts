@@ -28,6 +28,8 @@ export const defaultPrefs: Preferences = {
   upscaleQuality: "balanced",
   autoUpscale: "none",
   upscaleFaceDetail: false,
+  videoUpscale: "none",
+  rtxSmooth: false,
   hiddenAutoLockMinutes: 15,
   modelFolderHints: true,
   shareWithoutSettings: false,

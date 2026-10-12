@@ -221,8 +221,9 @@ export type ComposerBarProps = {
   aspectValue: string;
   defaultAspectSize: string;
   applyAspect: (value: string) => void;
-  /** Smart upscale's tabs on top of the size menu; left out where it doesn't apply (video). */
+  /** The upscale tabs on top of the size menu: Smart upscale for pictures, RTX for video on an NVIDIA card; left out where neither applies. */
   autoUpscale?: AutoUpscale;
+  upscaleKind?: "smart" | "rtx";
   onAutoUpscaleChange?: (value: AutoUpscale) => void;
   customSize: boolean;
   aspectLocked?: boolean;
@@ -277,7 +278,7 @@ export type ComposerBarProps = {
 export function ComposerBar(props: ComposerBarProps) {
   const {
     models, model, modelProfiles, showInpaint = true, showRapid = true, profileBadges, chooseModel, modelMenu, currentProfile, comfyOffline, comfyRestarting = false, onFindModels, onGetModels, strayModelCount, mode,
-    aspectPickerValue, aspectOptions, aspectValue, defaultAspectSize, applyAspect, autoUpscale = "none", onAutoUpscaleChange,
+    aspectPickerValue, aspectOptions, aspectValue, defaultAspectSize, applyAspect, autoUpscale = "none", upscaleKind = "smart", onAutoUpscaleChange,
     customSize, aspectLocked = false, width, widthMeta, setWidth, height, heightMeta, setHeight,
     steps, stepsMeta, setSteps, count, countMeta, setCount, loraActiveCount,
     hiddenSpace, onOpenLoras,
@@ -310,6 +311,7 @@ export function ComposerBar(props: ComposerBarProps) {
       defaultSize={defaultAspectSize}
       density={density}
       upscale={autoUpscale}
+      upscaleKind={upscaleKind}
       onUpscaleChange={onAutoUpscaleChange}
     />
   );

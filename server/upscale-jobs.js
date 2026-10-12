@@ -6,6 +6,7 @@ import { jobs, setTerminalJob, trackUpscale } from "./jobs.js";
 import { recordUpscale, upscaleEstimate } from "./timings.js";
 import { upscaleWork } from "./upscale-timing.js";
 import { faceDetailSource, upscaleGraph, upscalePlan } from "./upscale.js";
+import { rtxVideoGraph } from "./rtx.js";
 import { forgetComfyRun } from "./hidden-traces.js";
 import { releaseHiddenRun, rememberHiddenRun } from "./hidden-runs.js";
 import { attachVaultUpscale, patchVaultItem, setRuntimeUpscale } from "./vault.js";
@@ -148,10 +149,12 @@ export async function runUpscaleJob(jobId, body, info, target = galleryTarget(bo
   let socket = null;
   let clock = null;
   try {
-    const { graph, plan } = upscaleGraph(body, info);
+    // A video goes through RTX Video Super Resolution (rtx.js), a picture through SeedVR2.
+    const rtx = body.engine === "rtx";
+    const { graph, plan } = rtx ? rtxVideoGraph(body) : upscaleGraph(body, info);
     target.patch({ status: "running", jobId, quality: plan.quality, faceDetail: Boolean(body.faceDetail), scale: plan.scale, startedAt: new Date().toISOString(), error: "" });
     // How long it should take, from every SeedVR2 upscale here before (upscale-timing.js).
-    const learn = { quality: plan.quality, model: plan.model || "", faceDetail: Boolean(body.faceDetail), work: upscaleWork({ width: plan.estimatedWidth, height: plan.estimatedHeight }) };
+    const learn = { quality: plan.quality, model: plan.model || "", faceDetail: Boolean(body.faceDetail), work: upscaleWork({ width: plan.estimatedWidth, height: plan.estimatedHeight, count: plan.frames || 1 }) };
     const estimate = upscaleEstimate(learn);
     const run = { promptId: "", alive: null, progress: { value: 0, max: 0 }, endAt: null };
     clock = trackUpscale(jobId, estimate, (eta) => {
@@ -199,8 +202,8 @@ export async function runUpscaleJob(jobId, body, info, target = galleryTarget(bo
       }
       if (checked.state === "done") {
         const outputs = outputsFrom(checked.entry);
-        const output = outputs.find((item) => item.type === "image");
-        if (!output) throw new Error("The upscale ended without an image.");
+        const output = outputs.find((item) => item.type === (rtx ? "video" : "image"));
+        if (!output) throw new Error(rtx ? "The upscale ended without a video." : "The upscale ended without an image.");
         // Learned from, unless it is Hidden's or its start was never heard.
         const startAt = clock.startAt();
         if (startAt && !target.hidden) recordUpscale({ ...learn, ms: (run.endAt ?? Date.now()) - startAt, predicted: estimate });
@@ -252,6 +255,28 @@ export function startUpscale({ item, imageName, quality, faceDetail = false, inf
   setTimeout(() => hiddenKey
     ? runUpscaleJob(jobId, body, info, hiddenTarget(item.id, hiddenKey, [imageName]))
     : runUpscaleJob(jobId, body, info), 0);
+  return { jobId, plan };
+}
+
+/**
+ * Queues one video's RTX upscale: the upscale arrow on a finished video.
+ * Load Video reads ComfyUI's own copy of it, so nothing is uploaded.
+ */
+export function startRtxUpscale({ item, tier = "2k", smooth = 1, info }) {
+  const jobId = crypto.randomUUID();
+  const body = {
+    engine: "rtx",
+    galleryItemId: item.id,
+    source: item.rtxSource,
+    tier,
+    smooth,
+    width: Number(item.width || 0),
+    height: Number(item.height || 0),
+    frames: Number(item.settings?.frames || 0)
+  };
+  const { plan } = rtxVideoGraph(body);
+  jobs.set(jobId, { status: "queued", kind: "upscale", galleryItemId: item.id, startedAt: Date.now(), outputs: [] });
+  setTimeout(() => runUpscaleJob(jobId, body, info), 0);
   return { jobId, plan };
 }
 

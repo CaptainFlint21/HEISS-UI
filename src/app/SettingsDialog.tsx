@@ -13,7 +13,7 @@ import { Modal } from './Modal';
 import { HeatMark } from './HeatMark';
 import { MosaicButton } from './MosaicButton';
 import { apiFetch, apiJson } from './api';
-import type { ModelFile, Models, NodePackInfo, PackAutoInstall, Profile, OutputFolderReport, ShellPlan, UpdateStatus, UpscaleInstall, UpscaleStatus } from './types';
+import type { ModelFile, Models, NodePackInfo, PackAutoInstall, Preferences, Profile, OutputFolderReport, ShellPlan, UpdateStatus, UpscaleInstall, UpscaleStatus } from './types';
 import type { ModelFolders } from './useModelFolders';
 import { formatBytes, upscaleEfforts, upscaleQualityLabel } from './useUpscale';
 import { HiddenSettings } from './HiddenSettings';
@@ -27,6 +27,7 @@ import { boardUrl, openFeedback } from './feedback';
 import { HuggingFaceTokenSettings } from './HuggingFaceToken';
 import { OtherDevicesGroup } from './OtherDevices';
 import { TrashRow } from './TrashRow';
+import { loadRtxStatus, rtxStageLine, useRtxStatus } from './rtx';
 import type { ShowToast } from './toast';
 
 export const SETTINGS_SECTIONS = [
@@ -318,6 +319,46 @@ const profileName = (profile: Profile) => profile.displayName || profile.label;
 
 /** Models as small chips with their family, the first few shown and the rest a tap away. */
 type RapidSetupState = { installed: boolean; setup: null | (ShellPlan & { manager: boolean; pack: NodePackInfo; autoInstall: PackAutoInstall }) };
+
+/**
+ * RTX upscaling for videos, inside Smart upscale's drawer: only on an NVIDIA
+ * card. Where setup stands, the install for the missing part, what this
+ * machine runs (from the pack's own check), and the smoothing switch.
+ */
+function RtxVideoSettings({ prefs, setPrefs, showToast }: { prefs: Preferences; setPrefs: (patch: Partial<Preferences>) => void; showToast: ShowToast }) {
+  const status = useRtxStatus();
+  const [checking, setChecking] = React.useState(false);
+  const check = React.useCallback(async () => {
+    setChecking(true);
+    await loadRtxStatus({ fresh: true, probe: true });
+    setChecking(false);
+  }, []);
+  if (!status?.offered) return null;
+  const facts = [status.device?.name, status.cuda ? `PyTorch for CUDA ${status.cuda}` : '', status.packageInstalled ? 'NVIDIA package installed' : ''].filter(Boolean).join(' · ');
+  return (
+    <>
+      <Row
+        label="Videos (NVIDIA RTX)"
+        description={<>Upscales videos in seconds with NVIDIA RTX Video Super Resolution: the arrow on finished videos, and 2K or 4K in a video model’s size menu. It sharpens and cleans what’s there rather than drawing new detail.<br />{rtxStageLine(status)}{facts ? <><br /><small>{facts}</small></> : null}</>}
+        stacked
+      >
+        <button className="btn is-ghost" disabled={checking} onClick={check}><RefreshCw size={14} /> {checking ? 'Checking…' : 'Check again'}</button>
+      </Row>
+      {status.setup ? (
+        <div className="set-node-install">
+          <NodeInstall pack={status.setup.pack} plan={status.setup} managerHint={status.setup.manager} autoInstall={status.setup.autoInstall} showToast={showToast} onRestarted={() => { loadRtxStatus({ fresh: true, probe: true }); }} afterRestart={status.stage === 'nodes' ? 'Then NVIDIA’s package is the last step.' : 'Then check again here.'} />
+        </div>
+      ) : null}
+      <SwitchRow
+        label="Smoother video"
+        description={status.frameGeneration || !status.device ? 'Adds a frame between every two with RTX Frame Generation: 16 fps becomes 32, same length.' : 'Needs an RTX 40-series card or newer.'}
+        checked={Boolean(prefs.rtxSmooth) && (status.frameGeneration || !status.ready)}
+        disabled={Boolean(status.device) && !status.frameGeneration}
+        onChange={(next) => setPrefs({ rtxSmooth: next })}
+      />
+    </>
+  );
+}
 
 /** The HEISS UI Nodes install for Rapid, asked for only while some model is waiting on it. */
 function RapidSetup({ showToast, onInstalled }: { showToast: ShowToast; onInstalled: () => void }) {
@@ -946,6 +987,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
                     </div>
                   )) : null}
                   <UpscaleReadiness status={upscaleStatus} reason={upscaleUnavailableReason} install={upscaleInstall} onOpenSetup={() => upscaleSetup.openSetup()} onDownload={() => upscaleSetup.openSetup(null, { download: true })} />
+                  <RtxVideoSettings prefs={prefs} setPrefs={setPrefs} showToast={showToast} />
                 </>
               ) : null}
             </SettingsDrawer>

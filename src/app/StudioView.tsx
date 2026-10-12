@@ -20,6 +20,7 @@ import { runTitle, type Run } from './runs';
 import { UpscaleArrow } from './UpscaleArrow';
 import { UpscaleCompare } from './UpscaleCompare';
 import { canUpscaleItem, shortLeft, upscaledWithRun, upscaleTooltip, useUpscaleClock } from './useUpscale';
+import { useRtxOffered } from './rtx';
 import { UpscaleSetupDialog } from './UpscaleDialogs';
 import { ModelFoldersDialog } from './ModelFoldersDialog';
 import { UpscaleNoticePopover } from './UpscaleNotice';
@@ -117,8 +118,12 @@ function ComfyConnectionDot({ status, retrying, onClick }: { status: any; retryi
 
 export function StudioView({ view }: { view: Record<string, any> }) {
   const { active, applyAllSettings, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, characterMeta, clickViewer, comfyStatus, galleryGroups, stackRuns, openRuns, setRunOpen, unstackRun, copyToClipboard, copyItemToClipboard, count, countMeta, currentProfile, customSize, deleteItem, zenGallery, formatElapsed, galleryColumnCount, galleryLoaded, galleryCrossing, galleryStageRef, generate, generateDisabled, generateDisabledReason, generationDetailEntries, goLatestZen, hasMoreGallery, height, heightMeta, isDraggingViewer, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, onGalleryScroll, openItem, prefs, hiddenSpace, hideItems, unhideItems, profileBadges, prompt, promptLimit, refreshComfyStatus, removeReferenceAsset, renderedGallery, resetViewer, runningCount, selectReferenceAsset, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowGenerationSettings, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setZenControls, setZenGalleryOpen, setZenMode, showDetails, settings, showGenerationSettings, showNegativePrompt, showToast, sidebarControls, startViewerDrag, startViewerTouch, steps, stepsMeta, stopViewerDrag, submitZenPrompt, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, upscaleBusyIds, activateUpscale, cancelUpscale, upscaleDisplayUrl, upscaleSetup, upscaleStatus, upscaleInstall, upscaleUnavailableReason, health, setPrefs, upscaleNotices, dismissUpscaleNotice, refreshModels, refreshWorkflows, modelFolders } = view;
-  // Smart upscale works on images, and only while it is on in Settings.
+  // Smart upscale works on images, and only while it is on in Settings; videos get RTX's tabs on an NVIDIA card.
+  const rtxVideos = useRtxOffered();
   const smartUpscaleTabs = mode === "image" && prefs.smartUpscale !== false;
+  const rtxTabs = mode === "video" && prefs.smartUpscale !== false && rtxVideos;
+  const upscaleTier = rtxTabs ? prefs.videoUpscale || "none" : prefs.autoUpscale || "none";
+  const onUpscaleTier = smartUpscaleTabs ? view.chooseAutoUpscale : rtxTabs ? (tier: string) => setPrefs({ videoUpscale: tier }) : undefined;
   const strayModelCount = modelFolders?.strayCount || 0;
   const canUseNegativePrompt = currentProfile?.capabilities?.negativePrompt !== false;
   const { confirmAction, referenceAssets, referenceInputs, referenceInpaint, retryComfyStatus, comfyRetrying, comfyReconnectedAt } = view;
@@ -675,8 +680,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               aspectValue={aspectValue}
               defaultAspectSize={defaultAspectSize}
               applyAspect={applyAspect}
-              autoUpscale={prefs.autoUpscale || "none"}
-              onAutoUpscaleChange={smartUpscaleTabs ? view.chooseAutoUpscale : undefined}
+              autoUpscale={upscaleTier}
+              upscaleKind={rtxTabs ? "rtx" : "smart"}
+              onAutoUpscaleChange={onUpscaleTier}
               customSize={Boolean(customSize)}
               aspectLocked={Boolean(aspectLocked)}
               width={width}
@@ -793,8 +799,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               aspectValue={aspectValue}
               defaultAspectSize={defaultAspectSize}
               applyAspect={applyAspect}
-              autoUpscale={prefs.autoUpscale || "none"}
-              onAutoUpscaleChange={smartUpscaleTabs ? view.chooseAutoUpscale : undefined}
+              autoUpscale={upscaleTier}
+              upscaleKind={rtxTabs ? "rtx" : "smart"}
+              onAutoUpscaleChange={onUpscaleTier}
               customSize={Boolean(customSize)}
               aspectLocked={Boolean(aspectLocked)}
               width={width}
@@ -983,7 +990,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                   ) : null}
                   {active.status === "done" && active.url && !active.vaultLocked && !active.library ? <Tip content="Vary with a new seed"><button className="icon-button" aria-label="Vary this" onClick={() => view.varyItem(active)}><Shuffle size={15} /></button></Tip> : null}
                   {canUseStartImage && active.status === "done" && active.type === "image" && active.url && !active.vaultLocked && !active.library ? <Tip content="Use as reference image"><button className="icon-button" aria-label="Use as reference image" onClick={() => useOutputAsStartImage(active)}><ImagePlus size={15} /></button></Tip> : null}
-                  {prefs.smartUpscale !== false && canUpscaleItem(active) ? (
+                  {prefs.smartUpscale !== false && canUpscaleItem(active, rtxVideos) ? (
                     <span className="upscale-notice-anchor">
                     {upscaleNotices?.get(active.id) ? <UpscaleNoticePopover notice={upscaleNotices.get(active.id)} placement="viewer" onDismiss={() => dismissUpscaleNotice(active.id)} /> : null}
                     <ViewerUpscaleButton item={active} busy={Boolean(upscaleBusyIds?.has(active.id))} onCancel={cancelUpscale} onActivate={activateUpscale} />

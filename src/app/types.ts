@@ -287,6 +287,10 @@ export type Preferences = {
   upscaleQuality: UpscaleQuality;
   autoUpscale: AutoUpscale;
   upscaleFaceDetail: boolean;
+  /** RTX upscaling for every new video (NVIDIA RTX only): "none", "2k" or "4k" (server/rtx.js). */
+  videoUpscale: AutoUpscale;
+  /** RTX Frame Generation with it: twice the frames, the same length (RTX 40-series and newer). */
+  rtxSmooth: boolean;
   /** Minutes untouched before Hidden locks itself; 0 leaves it to the session. */
   hiddenAutoLockMinutes: number;
   /** Point out models in folders ComfyUI doesn’t read (sidebar notice, model menu, first-run dialog). */

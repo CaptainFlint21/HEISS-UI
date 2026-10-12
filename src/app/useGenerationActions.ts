@@ -8,6 +8,7 @@ import { retryRequest, type RetryOptions, type RetryRequest } from './retry';
 import { jobPollDelay } from './job-poll';
 import { downloadActions } from './useModelDownloads';
 import { autoUpscaleQuality } from './useUpscale';
+import { rtxOffered } from './rtx';
 import type { GalleryItem, Job } from './types';
 
 type GalleryPayload = { items?: GalleryItem[]; outputs?: GalleryItem[] };
@@ -191,6 +192,10 @@ export function useGenerationActions(view: any) {
         // but a persisted 2K/4K choice from before must not sneak an upscale in too.
         autoUpscale: mode === "image" && !inpaint && !(currentProfile?.aspectPolicy === "reference" && (referenceAssets || []).length) && prefs.smartUpscale !== false && autoUpscaleQuality(prefs.autoUpscale)
           ? { quality: autoUpscaleQuality(prefs.autoUpscale), faceDetail: Boolean(prefs.upscaleFaceDetail) }
+          : null,
+        // RTX upscale for a video run (server/rtx.js); the server drops it where the machine can't, and says why.
+        rtxVideo: mode === "video" && !hiddenSpace && prefs.smartUpscale !== false && rtxOffered() && (prefs.videoUpscale === "2k" || prefs.videoUpscale === "4k")
+          ? { tier: prefs.videoUpscale, smooth: Boolean(prefs.rtxSmooth) }
           : null
       };
       const queuedJobs: string[] = [];

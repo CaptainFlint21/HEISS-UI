@@ -164,7 +164,8 @@ async function installLocally(state, pack) {
       }
     }
   }
-  if (fs.existsSync(path.join(target, "requirements.txt"))) {
+  const requirements = pack.requirements || "requirements.txt";
+  if (fs.existsSync(path.join(target, requirements))) {
     state.step = "Checking ComfyUI’s PyTorch";
     let freeze;
     try {
@@ -176,7 +177,7 @@ async function installLocally(state, pack) {
     fs.writeFileSync(constraints, `${constraintsFrom(freeze)}\n`);
     state.step = "Installing what they need";
     try {
-      await run(state, python, [...pipArgs(python), "install", "-r", "requirements.txt", "-c", constraints, "--disable-pip-version-check"], target, pythonEnv(python));
+      await run(state, python, [...pipArgs(python), "install", "-r", requirements, "-c", constraints, "--disable-pip-version-check", ...(pack.pipIndex ? ["--extra-index-url", pack.pipIndex] : [])], target, pythonEnv(python));
     } catch (error) {
       if (/ResolutionImpossible|conflict/i.test(state.log)) throw new Error(`${pack.name} needs a different PyTorch or NumPy than ComfyUI has, so its packages weren’t installed. Check its page for a version that fits.`);
       throw error;
@@ -305,7 +306,7 @@ export async function startPackInstall(id, { overrideManager = false } = {}) {
       } else {
         await installLocally(state, pack);
       }
-      Object.assign(state, { status: "done", step: "Installed. Restart ComfyUI to load it.", finishedAt: Date.now() });
+      Object.assign(state, { status: "done", step: pack.noRestart ? "Installed." : "Installed. Restart ComfyUI to load it.", finishedAt: Date.now() });
     } catch (error) {
       Object.assign(state, { status: "error", error: error.message, step: "", finishedAt: Date.now() });
     }

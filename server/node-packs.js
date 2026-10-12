@@ -23,12 +23,29 @@ export const nodePacks = {
     name: "HEISS UI Nodes",
     repository: "https://github.com/tristmeister/ComfyUI-HEISS-UI-Nodes.git",
     folder: "ComfyUI-HEISS-UI-Nodes",
-    commit: "1ecf4ddaa50f6c2a4ac1851de341e9840fad71c5",
-    ref: "main, 2026-10-08",
+    commit: "39590b03eb71dd452c1e0d47100ae5986d2c2275",
+    ref: "feature/rtx, 2026-10-12",
     search: "HEISS UI",
     // It grows with HEISS: an installed older copy is updated to `commit` (pack-installer.js).
     update: true,
-    nodes: ["HeissRapid", "HeissRapidGuidance"]
+    nodes: ["HeissRapid", "HeissRapidGuidance", "HeissRTXVideo", "HeissRTXUpscale"]
+  },
+  // RTX upscaling's second part (docs/rtx-video.md): NVIDIA's own package, into ComfyUI's Python, from the
+  // same pack's requirements-rtx.txt, which NVIDIA cards alone ever install. Same folder and commit as `heiss`.
+  heissrtx: {
+    name: "NVIDIA RTX video package",
+    repository: "https://github.com/tristmeister/ComfyUI-HEISS-UI-Nodes.git",
+    folder: "ComfyUI-HEISS-UI-Nodes",
+    commit: "39590b03eb71dd452c1e0d47100ae5986d2c2275",
+    ref: "feature/rtx, 2026-10-12",
+    update: true,
+    requirements: "requirements-rtx.txt",
+    // NVIDIA hosts the wheels; PyPI only has a stub that fetches them while installing.
+    pipIndex: "https://pypi.nvidia.com",
+    // Its nodes import the package when they run, so it works without restarting ComfyUI.
+    noRestart: true,
+    nodes: ["HeissRTXVideo", "HeissRTXUpscale"],
+    note: "About 0.5 GB from NVIDIA, its models included."
   },
   seedvr2: {
     name: "SeedVR2 Video Upscaler",

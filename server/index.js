@@ -68,8 +68,9 @@ import { setupTips } from './setup-tips.js';
 import { linkModelFolders, modelFolderReport, unlinkModelFolder } from './model-folders.js';
 import { packInstallRoutes, packInstallState, startPackInstall } from './pack-installer.js';
 import { cancelModelInstall, downloadPlan, installState, managerAvailable, managerInfo, nodeInstallPlan, normalizeQuality, noteSystemRam, startModelInstall, upscalePlan, upscaleQualities, upscaleStatus } from './upscale.js';
-import { findUpscaleTarget, startUpscale, toggleUpscaleView } from './upscale-jobs.js';
+import { findUpscaleTarget, startRtxUpscale, startUpscale, toggleUpscaleView } from './upscale-jobs.js';
 import { dropsAutoUpscale, planRunUpscale } from './run-upscale.js';
+import { comfyOutputName, planRunRtx, rtxCheck, rtxStatusFrom, rtxTiers } from './rtx.js';
 import { autoDetectOutputDir, detectOutputDirs, inspectOutputDir, outputDirChoice, pickFolder } from './output-folder.js';
 import { compressJson, serveApp } from './http-assets.js';
 import { describeGitError, updateCheckout } from './git-update.js';
@@ -1611,6 +1612,12 @@ app.post("/api/generate", async (req, res) => {
   body.autoUpscale = body.kind === "image" && upscaleQualities.includes(autoUpscale?.quality)
     ? { quality: autoUpscale.quality, faceDetail: Boolean(autoUpscale.faceDetail) }
     : null;
+  // RTX upscaling of a video run (rtx.js): 2K or 4K, optionally smoother. Not for Hidden yet: its videos are sealed
+  // as they are made, and an upscale riding on one would leave ComfyUI's plaintext copy behind.
+  const rtxVideo = req.body?.rtxVideo;
+  body.rtxVideo = body.kind === "video" && !body.privateVault && rtxTiers[rtxVideo?.tier]
+    ? { tier: rtxVideo.tier, smooth: Boolean(rtxVideo.smooth) }
+    : null;
   // Recent prompts are the gallery's: nothing made for Hidden is ever written there.
   if (!body.privateVault) try { recordPrompt(body.prompt); } catch { /* a run matters more than its history */ }
   // An older page (or a draft restored from before the reference library) can
@@ -1697,7 +1704,8 @@ app.post("/api/generate", async (req, res) => {
   if (isMockJob) {
     setTimeout(() => runMockJob(id, body), 0);
   } else {
-    setTimeout(() => runJob(id, body, { prepare: body.autoUpscale ? (graph) => smartUpscalePrepare(graph, body) : null }).catch(() => null), 0);
+    const prepare = body.autoUpscale ? (graph) => smartUpscalePrepare(graph, body) : body.rtxVideo ? (graph) => rtxRunPrepare(graph, body) : null;
+    setTimeout(() => runJob(id, body, { prepare }).catch(() => null), 0);
   }
 });
 
@@ -1783,6 +1791,13 @@ app.post("/api/upscale/install/cancel", (req, res) => {
 app.post("/api/upscale", async (req, res) => {
   const info = await upscaleContext(res);
   if (!info) return;
+  // A video upscales with RTX, not SeedVR2: whether SeedVR2 is set up doesn't matter to it.
+  const videoId = String(req.body?.galleryItemId || "");
+  const video = findUpscaleTarget(videoId) || findVaultItem(encryptionKeyFromRequest(req), videoId);
+  if (video?.type === "video") {
+    await startRtxVideoUpscale(req, res, video, findUpscaleTarget(videoId) ? null : video);
+    return;
+  }
   const quality = normalizeQuality(req.body?.quality);
   const faceDetail = Boolean(req.body?.faceDetail);
   const status = upscaleStatus(info, quality);
@@ -1805,7 +1820,7 @@ app.post("/api/upscale", async (req, res) => {
     return;
   }
   if (item.type !== "image") {
-    res.status(400).json({ ok: false, reason: "video", error: "Only images can be upscaled." });
+    res.status(400).json({ ok: false, reason: "video", error: "Only pictures and videos can be upscaled." });
     return;
   }
   if (item.library) {
@@ -1837,6 +1852,79 @@ app.post("/api/upscale", async (req, res) => {
   const { jobId, plan } = startUpscale({ item, imageName, quality, faceDetail, info, customWorkflow, hiddenKey: hiddenItem ? hiddenKey : null });
   res.json({ ok: true, jobId, plan, revision: galleryRevisionValue() });
 });
+
+/**
+ * RTX upscaling's state on this machine (rtx.js): offered only on an NVIDIA
+ * card, then which part is missing, with its install panel. probe=1 also has
+ * the pack run a tiny upscale, so "ready" means it really ran here.
+ */
+async function rtxStatus({ fresh = false, probe = false } = {}) {
+  const { info, stats } = await loadComfyContext({ force: fresh });
+  const device = (stats || comfyCache.stats)?.devices?.[0] || null;
+  const check = await rtxCheck({ probe });
+  const status = rtxStatusFrom({ info, device, check });
+  if (status.stage === "nodes" || status.stage === "package") {
+    const id = status.stage === "nodes" ? "heiss" : "heissrtx";
+    status.setup = { manager: id === "heiss" ? await managerAvailable() : false, pack: nodePack(id), autoInstall: packInstallRoutes(id), ...packInstallPlan(nodePacks[id], comfyRootDir(), process.platform) };
+  }
+  return status;
+}
+
+app.get("/api/rtx/status", async (req, res) => {
+  try {
+    res.json({ ok: true, ...await rtxStatus({ fresh: req.query.fresh === "1", probe: req.query.probe === "1" }) });
+  } catch {
+    res.status(503).json({ ok: false, offline: true, restarting: comfyRestarting(), error: "ComfyUI is offline, so RTX upscaling isn’t available." });
+  }
+});
+
+/**
+ * The upscale arrow on a video: RTX upscaling, read straight from ComfyUI's
+ * output folder. Says why not, the way a picture's upscale does.
+ */
+async function startRtxVideoUpscale(req, res, item, hiddenItem) {
+  if (hiddenItem) {
+    res.status(400).json({ ok: false, reason: "hidden", error: "Videos in Hidden can’t be upscaled yet." });
+    return;
+  }
+  if (item.library) {
+    res.status(400).json({ ok: false, reason: "library", error: "Videos from an added folder stay in that folder, so they can’t be upscaled." });
+    return;
+  }
+  if (item.status !== "done") {
+    res.status(409).json({ ok: false, reason: "unfinished", error: "This video is still rendering. Upscale it when it’s done." });
+    return;
+  }
+  if (item.upscale?.status === "running") {
+    res.status(409).json({ ok: false, error: "This video is already being upscaled." });
+    return;
+  }
+  const status = await rtxStatus().catch(() => null);
+  if (!status?.ready) {
+    res.status(400).json({ ok: false, reason: "rtx", error: status?.reason || "RTX upscaling isn’t ready.", rtx: status });
+    return;
+  }
+  const source = comfyOutputName(item.url);
+  if (!source) {
+    res.status(400).json({ ok: false, reason: "source", error: "ComfyUI doesn’t have this video’s file, so it can’t be upscaled." });
+    return;
+  }
+  const tier = rtxTiers[req.body?.tier] ? req.body.tier : "2k";
+  const smooth = req.body?.smooth && status.frameGeneration ? 2 : 1;
+  try {
+    const { info } = await loadComfyContext();
+    const { jobId, plan } = startRtxUpscale({ item: { ...item, rtxSource: source }, tier, smooth, info });
+    res.json({ ok: true, jobId, plan, revision: galleryRevisionValue() });
+  } catch (error) {
+    res.status(400).json({ ok: false, reason: "source", error: error.message });
+  }
+}
+
+/** RTX upscaling inside a video run; like Smart upscale, the run goes ahead without it when it can't. */
+async function rtxRunPrepare(graph, body) {
+  const status = await rtxStatus().catch(() => null);
+  return planRunRtx(graph, body, status || { ready: false, reason: "RTX upscaling couldn’t check ComfyUI" });
+}
 
 /**
  * Smart upscale (2K / 4K in the size menu) goes into the run's own graph, so

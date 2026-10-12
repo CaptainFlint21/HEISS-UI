@@ -1,4 +1,4 @@
-import React, { createContext, lazy, Suspense, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { Media } from './components';
 import type { GalleryItem } from './types';
@@ -52,6 +52,9 @@ function GenerationMediaInstance({ item, muted, fit, children }: React.PropsWith
   // Unique to this item, so a reused file name never brings back an older picture (mediaUrl.ts).
   const source = mediaUrl(isThumbnail ? displayThumbnail! : displayUrl, item);
   const previewItem = pending ? item : lastPending.current;
+  // A video plays its RTX upscale while that is the version shown; the original stays the record.
+  const upscaledVideo = item.type === 'video' && item.upscaleActive && item.upscale?.url ? item.upscale.url : '';
+  const mediaItem = useMemo(() => (upscaledVideo ? { ...item, url: upscaledVideo, thumbnailUrl: undefined } : item), [item, upscaledVideo]);
   return (
     <div className={`generation-surface${pending ? ' is-pending' : ''}${resolving ? ' is-resolving' : ''}`}>
       {item.status === 'done' && item.type === 'image' && source && failedSource !== source ? (
@@ -62,7 +65,7 @@ function GenerationMediaInstance({ item, muted, fit, children }: React.PropsWith
             setFailedSource(source);
             setResolved(true);
           }} />
-      ) : !pending ? <Media item={item} muted={muted} /> : null}
+      ) : !pending ? <Media item={mediaItem} muted={muted} /> : null}
       {pending && inpaint ? (
         <div className="generation-inpaint" aria-hidden="true">
           <SafeImg className="generation-inpaint-base" src={`/api/reference-assets/${encodeURIComponent(inpaint.referenceId)}/media`} draggable={false} />
