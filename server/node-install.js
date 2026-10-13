@@ -69,10 +69,13 @@ export function packInstallPlan(pack, root = comfyRootDir(), platform = process.
   const index = pack.pipIndex ? ` --extra-index-url ${pack.pipIndex}` : "";
   const folder = customNodes || paths.join("ComfyUI", "custom_nodes");
   const clone = `git clone ${pack.repository}`;
+  // Git in the pack's folder trusts it for this one command: on a drive that records no owner (exFAT, a
+  // share, some Windows data drives) git otherwise stops with "dubious ownership". Quoted so sh doesn't glob.
+  const inPack = `git -c "safe.directory=*" -C ${pack.folder}`;
   // The reviewed commit (node-packs.js), the same one the one-click install takes.
-  const checkout = pack.commit ? `git -C ${pack.folder} checkout --detach ${pack.commit}` : "";
+  const checkout = pack.commit ? `${inPack} checkout --detach ${pack.commit}` : "";
   // A pack that moves with HEISS (`update`) is brought to its reviewed commit when an older copy is there.
-  const update = cloned && pack.update && checkout ? [`git -C ${pack.folder} fetch origin`, checkout] : [];
+  const update = cloned && pack.update && checkout ? [`${inPack} fetch origin`, checkout] : [];
   // A pack that moves with HEISS, on a computer HEISS can't look into (ComfyUI elsewhere): one command that works
   // whether an older copy is there or not, cloning only when it isn't, then bringing it to the reviewed commit.
   const either = !cloned && pack.update && checkout;
@@ -81,7 +84,7 @@ export function packInstallPlan(pack, root = comfyRootDir(), platform = process.
     powershell: `if (-not (Test-Path -LiteralPath "${pack.folder}")) { ${clone} }`,
     cmd: `(if not exist "${pack.folder}" ${clone})`
   };
-  const fetchFor = (shell) => (either ? [ensure[shell], `git -C ${pack.folder} fetch origin`, checkout] : cloned ? update : [clone, ...(checkout ? [checkout] : [])]);
+  const fetchFor = (shell) => (either ? [ensure[shell], `${inPack} fetch origin`, checkout] : cloned ? update : [clone, ...(checkout ? [checkout] : [])]);
   const fetchSteps = fetchFor("sh");
   const commands = [];
   if (win) {

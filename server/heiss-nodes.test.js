@@ -76,10 +76,10 @@ test("the copy on disk is read for its version, git or not", () => {
 
 test("the terminal command works with or without an older copy there", () => {
   const remote = packInstallPlan(nodePacks.heiss, "", "linux").commands[0].command;
-  assert.match(remote, /\{ \[ -d "ComfyUI-HEISS-UI-Nodes" \] \|\| git clone https:\/\/github\.com\/tristmeister\/ComfyUI-HEISS-UI-Nodes\.git; \} && git -C ComfyUI-HEISS-UI-Nodes fetch origin && git -C ComfyUI-HEISS-UI-Nodes checkout --detach [0-9a-f]{40}/);
+  assert.match(remote, /\{ \[ -d "ComfyUI-HEISS-UI-Nodes" \] \|\| git clone https:\/\/github\.com\/tristmeister\/ComfyUI-HEISS-UI-Nodes\.git; \} && git -c "safe\.directory=\*" -C ComfyUI-HEISS-UI-Nodes fetch origin && git -c "safe\.directory=\*" -C ComfyUI-HEISS-UI-Nodes checkout --detach [0-9a-f]{40}/);
   const [powershell, cmd] = packInstallPlan(nodePacks.heiss, "", "win32").commands;
   assert.match(powershell.command, /if \(-not \(Test-Path -LiteralPath "ComfyUI-HEISS-UI-Nodes"\)\) \{ git clone /);
-  assert.match(cmd.command, /\(if not exist "ComfyUI-HEISS-UI-Nodes" git clone [^)]+\) && git -C ComfyUI-HEISS-UI-Nodes fetch origin/);
+  assert.match(cmd.command, /\(if not exist "ComfyUI-HEISS-UI-Nodes" git clone [^)]+\) && git -c "safe\.directory=\*" -C ComfyUI-HEISS-UI-Nodes fetch origin/);
   // A pack that doesn't move with HEISS keeps its plain clone.
   assert.doesNotMatch(packInstallPlan(nodePacks.seedvr2, "", "linux").commands[0].command, /\[ -d/);
 });
