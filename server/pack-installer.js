@@ -103,6 +103,17 @@ function run(state, command, args, cwd, env = process.env) {
   });
 }
 
+/**
+ * git's arguments for a command inside `folder`, trusting that one folder.
+ * On a drive that records no owner (exFAT, FAT32, many network shares) git
+ * refuses every repository as of "dubious ownership"; a clone HEISS just made
+ * there included. Only this command, only this folder: git's own config is
+ * never changed.
+ */
+export function gitArgsIn(folder, args) {
+  return ["-c", `safe.directory=${path.resolve(folder).replaceAll("\\", "/")}`, ...args];
+}
+
 /** A pack's own version line (`PACK_VERSION = 3` in its versionFile) as it is on disk; 0 when there is none. */
 export function packVersionOnDisk(folder, pack) {
   if (!pack?.versionFile) return 0;
@@ -141,6 +152,7 @@ async function installLocally(state, pack) {
   if (!root || !python) throw new Error("ComfyUI isn't on this computer. Use the terminal steps instead.");
   const customNodes = path.join(root, "custom_nodes");
   const target = path.join(customNodes, pack.folder);
+  const git = (args) => run(state, "git", gitArgsIn(target, args), target);
   // An older copy that isn't a git checkout (a zip, or Manager's registry install) can't be moved to the reviewed
   // commit: set it aside, where ComfyUI won't load it (".disabled"), and install fresh. Nothing is deleted.
   if (pack.update && pack.version && fs.existsSync(target) && !fs.existsSync(path.join(target, ".git"))) {
@@ -158,11 +170,11 @@ async function installLocally(state, pack) {
       // Exactly the reviewed commit, never whatever the branch says today.
       await run(state, "git", ["clone", "--no-checkout", pack.repository, target], customNodes);
       if (pack.commit) {
-        await run(state, "git", ["-c", "advice.detachedHead=false", "checkout", "--detach", pack.commit], target);
-        const head = (await run(state, "git", ["rev-parse", "HEAD"], target)).trim();
+        await git(["-c", "advice.detachedHead=false", "checkout", "--detach", pack.commit]);
+        const head = (await git(["rev-parse", "HEAD"])).trim();
         if (head !== pack.commit) throw new Error("The download isn’t the reviewed version.");
       } else {
-        await run(state, "git", ["checkout"], target);
+        await git(["checkout"]);
       }
     } catch (error) {
       // Only what this install created goes; a folder that was already there is never touched.
@@ -174,15 +186,15 @@ async function installLocally(state, pack) {
   } else if (pack.update && pack.commit && fs.existsSync(path.join(target, ".git"))) {
     // HEISS's own pack moves with HEISS: an older checkout is brought to the reviewed commit, if nobody edited it.
     state.step = "Updating the nodes";
-    const head = (await run(state, "git", ["rev-parse", "HEAD"], target)).trim();
+    const head = (await git(["rev-parse", "HEAD"])).trim();
     // Already there, or further along than the pin (someone updated it themselves): leave it.
-    const ahead = head !== pack.commit && await run(state, "git", ["merge-base", "--is-ancestor", pack.commit, head], target).then(() => true, () => false);
+    const ahead = head !== pack.commit && await git(["merge-base", "--is-ancestor", pack.commit, head]).then(() => true, () => false);
     if (head !== pack.commit && !ahead) {
-      if ((await run(state, "git", ["status", "--porcelain"], target)).trim()) throw new Error(`${pack.folder} has local changes, so HEISS left it alone. Update it yourself, or remove the folder and install again.`);
-      const known = await run(state, "git", ["cat-file", "-e", `${pack.commit}^{commit}`], target).then(() => true, () => false);
+      if ((await git(["status", "--porcelain"])).trim()) throw new Error(`${pack.folder} has local changes, so HEISS left it alone. Update it yourself, or remove the folder and install again.`);
+      const known = await git(["cat-file", "-e", `${pack.commit}^{commit}`]).then(() => true, () => false);
       try {
-        if (!known) await run(state, "git", ["fetch", "--quiet", "origin"], target);
-        await run(state, "git", ["-c", "advice.detachedHead=false", "checkout", "--detach", pack.commit], target);
+        if (!known) await git(["fetch", "--quiet", "origin"]);
+        await git(["-c", "advice.detachedHead=false", "checkout", "--detach", pack.commit]);
       } catch {
         throw new Error(`Couldn’t update ${pack.name} to its reviewed version. Check the internet connection, or remove its folder and install again.`);
       }
