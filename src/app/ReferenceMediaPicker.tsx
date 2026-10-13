@@ -7,9 +7,10 @@ import { Tip } from "./components";
 import { useDismiss } from "./useDismiss";
 import { useHiddenActions } from "./hiddenContext";
 import { deleteReferenceAsset, listReferenceAssets, referenceAssetFromGallery, uploadReferenceAsset } from "./api";
-import type { MediaInput, ReferenceAsset, ReferenceInpaint, SelectedReferenceAsset } from "./types";
+import type { MediaInput, ReferenceAsset, ReferenceInpaint, ReferenceRoleControl, SelectedReferenceAsset } from "./types";
 import { InpaintStudio } from "./InpaintStudio";
 import { SafeImg } from './SafeImg';
+import { showToastTone } from './toast';
 
 type PickerTab = "generation" | "hidden" | "upload";
 
@@ -309,7 +310,7 @@ const rememberInpaintIntro = () => { try { localStorage.setItem(inpaintIntroKey,
  * image-to-image) and settles into a round +. With an
  * image it becomes a squircle thumbnail that opens into a small menu on hover.
  */
-function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, onOpen, onRemove }: {
+function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, role = null, onOpen, onRemove }: {
   input: MediaInput;
   selected: ReferenceAsset | null;
   open: boolean;
@@ -317,7 +318,9 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, on
   progress: number;
   fresh: boolean;
   /** Painting on this image, for a model that can inpaint: the studio's state and how to open it. */
-  paint?: { masked: boolean; open: boolean; intro: boolean; onOpen: () => void } | null;
+  paint?: { masked: boolean; open: boolean; intro: boolean; hidden?: boolean; onOpen: () => void } | null;
+  /** For a reference that can frame the output: edit this image, or only use it as a reference. */
+  role?: ReferenceRoleControl | null;
   onOpen: () => void;
   onRemove: () => void;
 }) {
@@ -335,6 +338,21 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, on
   const [hover, setHover] = React.useState(false);
   const hoverTimer = React.useRef(0);
   React.useEffect(() => () => window.clearTimeout(hoverTimer.current), []);
+  // The brush folds by its measured width: the menu sizes to its content, where CSS can't tween to "auto".
+  const paintSlot = React.useRef<HTMLSpanElement>(null);
+  const paintWidth = React.useRef(0);
+  const paintHidden = Boolean(paint?.hidden);
+  const paintWasHidden = React.useRef(paintHidden);
+  React.useLayoutEffect(() => {
+    const slot = paintSlot.current;
+    if (!slot) return;
+    const was = paintWasHidden.current;
+    paintWasHidden.current = paintHidden;
+    if (!paintHidden) paintWidth.current = slot.scrollWidth;
+    if (was === paintHidden || !paintWidth.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const open = `${paintWidth.current}px`;
+    slot.animate({ width: paintHidden ? [open, "0px"] : ["0px", open] }, { duration: 320, easing: "cubic-bezier(.16, 1, .3, 1)" });
+  });
   const hoverTo = (next: boolean, event: React.PointerEvent) => {
     if (event.pointerType === "touch") return;
     window.clearTimeout(hoverTimer.current);
@@ -369,38 +387,57 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, on
     );
   }
 
+  // The thumbnail is the anchor and says what the image is at rest (a ring for Edit, REF for Ref);
+  // the strip that grows out of it on hover holds only the choices: Edit | Ref and the brush.
+  const menu = Boolean(role || paint);
+  const name = `${isStart ? "Start image" : label}: ${referenceName(selected.name)}`;
   return (
     <div
-      className={cn("ref-chip ref-selected", (open || paint?.open) && "is-open", hover && "is-hover", paint?.intro && "is-intro", fresh && "is-new")}
+      className={cn("ref-chip ref-selected", (open || paint?.open) && "is-open", hover && "is-hover", paint?.intro && "is-intro", fresh && "is-new", role?.value === "edit" && "is-edit")}
       onPointerEnter={(event) => hoverTo(true, event)}
       onPointerLeave={(event) => hoverTo(false, event)}
     >
       {/* The menu reveals leftward from behind the thumbnail with a clip-path, so
           nothing reflows and the thumbnail never moves. */}
-      <div className="ref-menu">
-        <button type="button" className="ref-menu-name" onClick={onOpen} tabIndex={-1}>
-          <strong>{isStart ? "Start image" : label}</strong>
-          <small>{referenceName(selected.name)}</small>
-        </button>
-        <Tip content={`Remove ${label.toLowerCase()}`}>
-          <button type="button" className="ref-menu-remove" aria-label={`Remove ${label.toLowerCase()}`} onClick={onRemove}><X size={13} /></button>
-        </Tip>
-        {paint ? (
+      {menu ? <div className="ref-menu">
+        {role ? (
           <>
-            <span className="ref-menu-divider" aria-hidden="true" />
+            <div className={cn("ref-menu-role", role.value === "reference" && "is-ref")} role="radiogroup" aria-label="What this image is">
+              {/* One thumb slides between the two, like the size menu's tabs. */}
+              <i aria-hidden="true" />
+              <Tip content="Change this picture: the result keeps its size and framing">
+                <button type="button" role="radio" aria-checked={role.value === "edit"} className={cn(role.value === "edit" && "is-active")} onClick={() => role.onChange("edit")}>Edit</button>
+              </Tip>
+              <Tip content="Let it guide a new picture, at the size you picked">
+                <button type="button" role="radio" aria-checked={role.value === "reference"} className={cn(role.value === "reference" && "is-active")} onClick={() => role.onChange("reference")}>Ref</button>
+              </Tip>
+            </div>
+          </>
+        ) : null}
+        {paint ? (
+          // Folds away (rather than vanishing) while the image is a Ref, so the menu glides to its new width.
+          <span ref={paintSlot} className={cn("ref-menu-paint-slot", paint.hidden && "is-hidden")} aria-hidden={paint.hidden || undefined}>
+            {role ? <span className="ref-menu-divider" aria-hidden="true" /> : null}
             <Tip content={paint.masked ? "Change the painted part" : "Paint over a part to change only that"}>
-              <button type="button" className={cn("ref-menu-paint", paint.masked && "is-masked", paint.open && "is-active")} aria-label={paint.masked ? "Edit the painted part" : "Paint the part to change"} aria-pressed={paint.open} onClick={paint.onOpen}>
+              <button type="button" className={cn("ref-menu-paint", paint.masked && "is-masked", paint.open && "is-active")} aria-label={paint.masked ? "Edit the painted part" : "Paint the part to change"} aria-pressed={paint.open} tabIndex={paint.hidden ? -1 : undefined} onClick={paint.onOpen}>
                 <Brush size={17} />
                 <span className="ref-menu-paint-label"><span>{coarsePointer() ? "Tap" : "Click"} to inpaint</span></span>
               </button>
             </Tip>
-          </>
+          </span>
         ) : null}
-      </div>
-      <button type="button" data-open-trigger className="ref-thumb" onClick={onOpen} aria-label={`Change ${label.toLowerCase()}, currently ${selected.name}`} aria-expanded={open}>
-        {image && !broken ? <img src={image} alt="" draggable={false} onError={() => setBroken(true)} /> : selected.source === "vault" ? <LockKeyhole size={14} /> : <ImageIcon size={15} />}
-      </button>
+      </div> : null}
+      <Tip content={`${name} · Click to change`}>
+        <button type="button" data-open-trigger className="ref-thumb" onClick={onOpen} aria-label={`Change ${label.toLowerCase()}, currently ${selected.name}`} aria-expanded={open}>
+          {image && !broken ? <img src={image} alt="" draggable={false} onError={() => setBroken(true)} /> : selected.source === "vault" ? <LockKeyhole size={14} /> : <ImageIcon size={15} />}
+        </button>
+      </Tip>
+      {/* Remove on the thumbnail's corner, where it's expected and far from Edit | Ref; Undo is in its toast. */}
+      <Tip content={`Remove ${label.toLowerCase()}`}>
+        <button type="button" className="ref-thumb-remove" aria-label={`Remove ${label.toLowerCase()}`} onClick={onRemove}><X size={10} strokeWidth={2.8} /></button>
+      </Tip>
       {paint?.masked ? <i className="ref-mask-badge" aria-hidden="true"><Brush size={9} strokeWidth={2.6} /></i> : null}
+      {role ? <i className={cn("ref-role-badge", role.value === "reference" && "is-on")} aria-hidden="true">REF</i> : null}
     </div>
   );
 }
@@ -411,9 +448,10 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, on
  * Every reference input of the workflow, top right of the composer, plus the
  * picker popover and drop-and-paste uploads on the whole prompt bar.
  */
-export function ReferenceSlots({ inputs, inpaint = null, selected, onSelect, onRemove, confirmDelete, onError }: {
+export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, onSelect, onRemove, confirmDelete, onError }: {
   inputs: MediaInput[];
   inpaint?: ReferenceInpaint | null;
+  role?: ReferenceRoleControl | null;
   selected: SelectedReferenceAsset[];
   onSelect: (slot: string, asset: ReferenceAsset) => void;
   onRemove: (slots: string | string[]) => void;
@@ -445,14 +483,18 @@ export function ReferenceSlots({ inputs, inpaint = null, selected, onSelect, onR
   React.useEffect(() => { if (!inpaint) setPainting(false); }, [inpaint]);
   const paintedAsset = inpaint ? selected.find((item) => item.slot === inpaint.slot)?.asset || null : null;
   React.useEffect(() => { setPainting(false); }, [paintedAsset?.id]);
+  // Ref only guides a new picture, so there is nothing of this image to paint: Ref closes the brush studio.
+  const asRef = role?.value === "reference";
+  React.useEffect(() => { if (asRef) setPainting(false); }, [asRef]);
   // The first image that can be painted on shows where the brush is, once, by opening its menu for a moment.
   const [introSlot, setIntroSlot] = React.useState("");
   React.useEffect(() => {
-    if (!inpaint || !paintedAsset || inpaintIntroduced()) return;
+    // Not while it's a Ref: the brush is folded away, and the one-time intro would be spent on nothing.
+    if (!inpaint || !paintedAsset || asRef || inpaintIntroduced()) return;
     const start = window.setTimeout(() => setIntroSlot(inpaint.slot), 500);
     const end = window.setTimeout(() => { setIntroSlot(""); rememberInpaintIntro(); }, 3600);
     return () => { window.clearTimeout(start); window.clearTimeout(end); setIntroSlot(""); };
-  }, [inpaint?.slot, paintedAsset?.id]);
+  }, [inpaint?.slot, paintedAsset?.id, asRef]);
   // Find the prompt bar whenever this renders into it. On first mount there may be
   // no inputs yet (the workflow is still loading), so nothing is rendered to look from.
   React.useLayoutEffect(() => {
@@ -597,14 +639,21 @@ export function ReferenceSlots({ inputs, inpaint = null, selected, onSelect, onR
             busy={uploadSlot === input.id}
             progress={progress}
             fresh={freshSlot === input.id}
+            // Inpainting changes part of this very image, which is an edit: a Ref only guides a new picture.
             paint={inpaint && inpaint.slot === input.id && assetFor(input.id) ? {
+              hidden: role?.slot === input.id && role.value === "reference",
               masked: Boolean(inpaint.mask),
               open: painting,
               intro: introSlot === input.id,
               onOpen: () => { setOpenSlot(""); setIntroSlot(""); rememberInpaintIntro(); setPainting((current) => !current); }
             } : null}
+            role={role && role.slot === input.id && assetFor(input.id) ? role : null}
             onOpen={() => { setPainting(false); setOpenSlot((current) => current === input.id ? "" : input.id); }}
-            onRemove={() => onRemove(input.id)}
+            onRemove={() => {
+              const asset = assetFor(input.id);
+              onRemove(input.id);
+              if (asset) showToastTone(`Removed ${(input.label || "reference image").toLowerCase()}`, "removed", { action: { label: "Undo", onClick: () => onSelect(input.id, asset) } });
+            }}
           />
         ))}
       </div>

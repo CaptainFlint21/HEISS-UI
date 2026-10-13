@@ -1,9 +1,9 @@
 import React from 'react';
 import { useNeighborPrefetch } from './useNeighborPrefetch';
 import { GridAutoplayButton } from './GridAutoplayButton';
-import { ArrowLeft, ChevronDown, CircleStop, Columns2, Shuffle, ChevronLeft, ChevronRight, ChevronUp, Download, Eye, EyeOff, GalleryHorizontalEnd, ImagePlus, Lock, LockKeyhole, Maximize2, Minimize2, PanelLeft, Plug, RefreshCw, RotateCcw, Settings, SlidersHorizontal, Smartphone, Square, Star, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { ArrowLeft, ChevronDown, CircleStop, Columns2, ChevronLeft, ChevronRight, ChevronUp, Download, Eye, EyeOff, GalleryHorizontalEnd, ImagePlus, Lock, LockKeyhole, Maximize2, Minimize2, PanelLeft, Plug, RefreshCw, RotateCcw, Settings, SlidersHorizontal, Smartphone, Square, Star, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { cn, nearTextLimit, settingsText } from './format';
+import { cn, nearTextLimit, settingsText, type GenerationDetailSection } from './format';
 import { GallerySkeleton, Media, Skeleton, Tip } from './components';
 import { PromptIdeas } from './PromptIdeas';
 import { useHorizontalWheel, useWheelRef } from './wheel';
@@ -119,11 +119,9 @@ function ComfyConnectionDot({ status, retrying, onClick }: { status: any; retryi
 
 export function StudioView({ view }: { view: Record<string, any> }) {
   const { active, applyAllSettings, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, characterMeta, clickViewer, comfyStatus, galleryGroups, stackRuns, openRuns, setRunOpen, unstackRun, copyToClipboard, copyItemToClipboard, count, countMeta, currentProfile, customSize, deleteItem, zenGallery, formatElapsed, galleryColumnCount, galleryLoaded, galleryCrossing, galleryStageRef, generate, generateDisabled, generateDisabledReason, generationDetailEntries, goLatestZen, hasMoreGallery, height, heightMeta, isDraggingViewer, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, onGalleryScroll, openItem, prefs, hiddenSpace, hideItems, unhideItems, profileBadges, prompt, promptLimit, refreshComfyStatus, removeReferenceAsset, renderedGallery, resetViewer, runningCount, selectReferenceAsset, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowGenerationSettings, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setZenControls, setZenGalleryOpen, setZenMode, showDetails, settings, showGenerationSettings, showNegativePrompt, showToast, sidebarControls, startViewerDrag, startViewerTouch, steps, stepsMeta, stopViewerDrag, submitZenPrompt, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, upscaleBusyIds, activateUpscale, cancelUpscale, upscaleDisplayUrl, upscaleSetup, upscaleStatus, upscaleInstall, upscaleUnavailableReason, health, setPrefs, upscaleNotices, dismissUpscaleNotice, refreshModels, refreshWorkflows, modelFolders } = view;
-  // Smart upscale works on images, and only while it is on in Settings; videos get RTX's tabs on an NVIDIA card.
+  // Videos get RTX's upscale tabs on an NVIDIA card, while upscaling is on in Settings.
   const rtxVideos = useRtxOffered();
-  const smartUpscaleTabs = mode === "image" && prefs.smartUpscale !== false;
   const rtxTabs = mode === "video" && prefs.smartUpscale !== false && rtxVideos;
-  const upscaleTier = rtxTabs ? prefs.videoUpscale || "none" : prefs.autoUpscale || "none";
   // A video tier on a ComfyUI without HEISS UI Nodes: the HEISS Nodes dialog first, then the tier is on.
   const chooseVideoTier = async (tier: string) => {
     if (tier === "none") return setPrefs({ videoUpscale: tier });
@@ -131,10 +129,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     if (rtx?.stage === "nodes") return requireHeissNodes("rtx", () => setPrefs({ videoUpscale: tier }));
     setPrefs({ videoUpscale: tier });
   };
-  const onUpscaleTier = smartUpscaleTabs ? view.chooseAutoUpscale : rtxTabs ? chooseVideoTier : undefined;
   const strayModelCount = modelFolders?.strayCount || 0;
   const canUseNegativePrompt = currentProfile?.capabilities?.negativePrompt !== false;
-  const { confirmAction, referenceAssets, referenceInputs, referenceInpaint, retryComfyStatus, comfyRetrying, comfyReconnectedAt } = view;
+  const { confirmAction, referenceAssets, referenceInputs, referenceInpaint, referenceRole, retryComfyStatus, comfyRetrying, comfyReconnectedAt } = view;
   const gallerySearch = (view.gallerySearch || emptySearch) as GallerySearch;
   const setGallerySearch = view.setGallerySearch as (next: GallerySearch) => void;
   const toggleFavorite = view.toggleFavorite as (items: GalleryItem[], favorite: boolean) => void;
@@ -564,7 +561,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     <HiddenActionsContext.Provider value={hiddenActions}>
     <TileLongPressContext.Provider value={phoneTiles}>
     <FavoriteContext.Provider value={toggleFavorite}>
-    <div className={cn(phone ? "phone-shell" : prefs.zenMode ? "zen-shell" : "app-shell", showNegativePrompt && canUseNegativePrompt && "negative-open", hiddenSpace && "is-hidden-space", hiddenLocked && "is-hidden-locked", passageClass)}>
+    <div className={cn(phone ? "phone-shell" : prefs.zenMode ? "zen-shell" : "app-shell", showNegativePrompt && canUseNegativePrompt && "negative-open", hiddenSpace && "is-hidden-space", hiddenLocked && "is-hidden-locked", !hiddenLocked && (searchOpen || searchOn) && "is-searching", passageClass)}>
       {phone ? <RunSheet run={runSheet} onClose={() => setRunSheet(null)} openItem={openItem} onShowInGallery={showRunInGallery} /> : null}
       {phone ? (
         <PhoneShell
@@ -688,9 +685,19 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               aspectValue={aspectValue}
               defaultAspectSize={defaultAspectSize}
               applyAspect={applyAspect}
-              autoUpscale={upscaleTier}
-              upscaleKind={rtxTabs ? "rtx" : "smart"}
-              onAutoUpscaleChange={onUpscaleTier}
+              sizeTier={customSize ? "custom" : view.sizeTier}
+              sizeMax={view.sizeMax}
+              customLimits={view.customLimits}
+              chooseSizeTier={view.chooseSizeTier}
+              applyCustomRatio={view.applyCustomRatio}
+              setCustomDimensions={view.setCustomDimensions}
+              savedSizes={view.savedSizes}
+              saveCustomSize={view.saveCustomSize}
+              renameSavedSize={view.renameSavedSize}
+              removeSavedSize={view.removeSavedSize}
+              pickSavedSize={view.pickSavedSize}
+              videoUpscale={rtxTabs ? prefs.videoUpscale || "none" : undefined}
+              onVideoUpscaleChange={rtxTabs ? chooseVideoTier : undefined}
               customSize={Boolean(customSize)}
               aspectLocked={Boolean(aspectLocked)}
               width={width}
@@ -719,6 +726,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               comfyRetrying={Boolean(comfyRetrying)}
               referenceInputs={referenceInputs}
               referenceInpaint={referenceInpaint}
+              referenceRole={referenceRole}
               loraMismatch={view.loraMismatch}
               onDismissLoraMismatch={view.dismissLoraMismatch}
               setupTip={view.setupTip}
@@ -807,9 +815,19 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               aspectValue={aspectValue}
               defaultAspectSize={defaultAspectSize}
               applyAspect={applyAspect}
-              autoUpscale={upscaleTier}
-              upscaleKind={rtxTabs ? "rtx" : "smart"}
-              onAutoUpscaleChange={onUpscaleTier}
+              sizeTier={customSize ? "custom" : view.sizeTier}
+              sizeMax={view.sizeMax}
+              customLimits={view.customLimits}
+              chooseSizeTier={view.chooseSizeTier}
+              applyCustomRatio={view.applyCustomRatio}
+              setCustomDimensions={view.setCustomDimensions}
+              savedSizes={view.savedSizes}
+              saveCustomSize={view.saveCustomSize}
+              renameSavedSize={view.renameSavedSize}
+              removeSavedSize={view.removeSavedSize}
+              pickSavedSize={view.pickSavedSize}
+              videoUpscale={rtxTabs ? prefs.videoUpscale || "none" : undefined}
+              onVideoUpscaleChange={rtxTabs ? chooseVideoTier : undefined}
               customSize={Boolean(customSize)}
               aspectLocked={Boolean(aspectLocked)}
               width={width}
@@ -838,6 +856,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               comfyRetrying={Boolean(comfyRetrying)}
               referenceInputs={referenceInputs}
               referenceInpaint={referenceInpaint}
+              referenceRole={referenceRole}
               loraMismatch={view.loraMismatch}
               onDismissLoraMismatch={view.dismissLoraMismatch}
               setupTip={view.setupTip}
@@ -940,27 +959,51 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                           </div>
                         </div>
                       ) : null}
+                      {/* On a phone the composer is a sheet: each of these opens it with the change in place, as Reuse does. */}
                       <ViewerActions
                         item={active}
-                        copied={viewerCopy.copied === "settings"}
-                        onUseSettings={() => applyAllSettings(active)}
-                        onCopySettings={() => viewerCopy.copyWith(() => copyToClipboard(settingsText(active)), "settings")}
-                        onUseLoras={() => applyLoras(active)}
-                        onUseAsReference={canUseStartImage && active.status === "done" && active.type === "image" && active.url && !active.vaultLocked && !active.library ? () => useOutputAsStartImage(active) : undefined}
+                        onUseSettings={() => (phone ? phoneItemActions.reuse(active) : applyAllSettings(active))}
+                        onUseLoras={() => { applyLoras(active); if (phone) { setActive(null); setPhoneCreate(true); } }}
+                        onUseAsReference={canUseStartImage && active.status === "done" && active.type === "image" && active.url && !active.vaultLocked && !active.library ? () => (phone ? phoneItemActions.useAsReference!(active) : useOutputAsStartImage(active)) : undefined}
                       />
                       {generationDetailEntries(active).length ? (
                         <details className="settings-disclosure" open={showGenerationSettings} onToggle={(event) => setShowGenerationSettings(event.currentTarget.open)}>
-                          <summary>Generation settings</summary>
-                          {generationDetailEntries(active).map((section: { title: string; rows: Array<[string, string]> }) => (
+                          <summary>
+                            <span>Generation details</span>
+                            {/* Everything here, as text to paste into a note or a chat; it never opens or closes the panel. */}
+                            {active.library ? null : (
+                              <Tip content="Copy the prompt, model, LoRAs and settings as text">
+                                <button type="button" className={cn("detail-copy", viewerCopy.copied === "settings" && "is-copied")} onClick={(event) => { event.preventDefault(); event.stopPropagation(); viewerCopy.copyWith(() => copyToClipboard(settingsText(active)), "settings"); }}>
+                                  <CopyIcon copied={viewerCopy.copied === "settings"} size={13} />
+                                  <span>{viewerCopy.copied === "settings" ? "Copied" : "Copy as text"}</span>
+                                </button>
+                              </Tip>
+                            )}
+                            <span className="sr-only" role="status">{viewerCopy.copied === "settings" ? "Details copied" : ""}</span>
+                          </summary>
+                          {generationDetailEntries(active).map((section: GenerationDetailSection) => (
                             <div className="detail-section" key={section.title}>
                               <h4>{section.title}</h4>
-                              <div className="detail-grid">
-                                {section.rows.map(([key, value], index) => (
-                                  <React.Fragment key={`${key}-${index}`}>
-                                    <span>{key}</span><strong>{value}</strong>
-                                  </React.Fragment>
-                                ))}
-                              </div>
+                              {section.rows.length ? (
+                                <div className="detail-grid">
+                                  {section.rows.map(([key, value], index) => (
+                                    <React.Fragment key={`${key}-${index}`}>
+                                      <span>{key}</span><strong>{value}</strong>
+                                    </React.Fragment>
+                                  ))}
+                                </div>
+                              ) : null}
+                              {section.loras?.length ? (
+                                <ul className="detail-loras" aria-label="LoRAs">
+                                  {section.loras.map((lora, index) => (
+                                    <li key={`${lora.name}-${index}`} className="detail-lora">
+                                      <span className="detail-lora-name" title={lora.name}>{lora.name}</span>
+                                      <i aria-hidden="true" />
+                                      <span className="detail-lora-strength" aria-label={`strength ${lora.strength}`}>{lora.strength}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : null}
                             </div>
                           ))}
                         </details>
@@ -996,7 +1039,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                       </button>
                     </Tip>
                   ) : null}
-                  {active.status === "done" && active.url && !active.vaultLocked && !active.library ? <Tip content="Vary with a new seed"><button className="icon-button" aria-label="Vary this" onClick={() => view.varyItem(active)}><Shuffle size={15} /></button></Tip> : null}
                   {canUseStartImage && active.status === "done" && active.type === "image" && active.url && !active.vaultLocked && !active.library ? <Tip content="Use as reference image"><button className="icon-button" aria-label="Use as reference image" onClick={() => useOutputAsStartImage(active)}><ImagePlus size={15} /></button></Tip> : null}
                   {prefs.smartUpscale !== false && canUpscaleItem(active, rtxVideos) ? (
                     <span className="upscale-notice-anchor">

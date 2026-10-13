@@ -16,12 +16,20 @@ npm test
 npm run build
 ```
 
+## Missing packages and demo mode
+
+Both `npm run dev` and `npm start` reinstall missing runtime packages, so an incomplete `node_modules` folder doesn't stop a normal start.
+
+`npm run dev:demo` (or `HEISS_DEMO=1`) is for agent and UI testing without a GPU. When ComfyUI is unreachable it offers fake models and returns placeholder images. It's off otherwise, so a normal install shows ComfyUI as offline instead.
+
+`npm run check:updates` lists outdated dependencies.
+
 ## Pull requests
 
 - Keep changes focused. One idea per PR is easier to review.
 - Keep the UI consistent with what's there: dark canvas, floating pill surfaces, one white primary action, and the square pixel accent used sparingly.
 - Keep server changes local-only by default.
-- Document any new environment variable in `.env.example` and the README.
+- Document any new environment variable in `.env.example` and [CONFIGURATION.md](./CONFIGURATION.md).
 - Don't commit model files, generated media, logs or `.env` files.
 - New workflow templates belong in `workflows/` with a `heissUi` mapping block. See [the workflow guide](../../workflows/README.md).
 - New model families (and the custom nodes, encoders or VAEs they need) follow [the model guide](./MODELS.md).
@@ -46,7 +54,7 @@ Until the public 1.0 release, versions stay at `0.x.y`:
 Before every release, on a real ComfyUI with GPU:
 
 1. Generate with three or four model families, including one all-in-one checkpoint and one model-only file.
-2. Run one smart upscale.
+2. Run one Smart upscale (a 2K run and one from the upscale arrow) and one inpaint.
 3. Unpack the release zip (`npm run package` builds it) in a fresh folder and start it with its launcher.
 4. Check that **Settings › About** shows the version and the update check answers.
 
@@ -88,7 +96,7 @@ Between releases a source checkout shows how far it is past its tag in **Setting
 
 ## Found a bug?
 
-Post it on the [feedback board](https://heiss-ui.vercel.app/board/), from the website or from the app (**Settings › About**, or **Report bug** on a failed card), or [open an issue](https://github.com/tristmeister/HEISS-UI/issues). Say what you did, what you expected and what happened. Your ComfyUI version and the model or workflow you used help a lot. Ideas and questions go on the same board. To talk something through first, there's the [Discord](https://discord.gg/Hf7ysvDeGa).
+Post it on the [feedback board](https://heiss-ui.vercel.app/board/), from the website or from the app (**Idea or bug?** at the bottom of the Settings sidebar, **Settings › About**, or **Report bug** on a failed card), or [open an issue](https://github.com/tristmeister/HEISS-UI/issues). Say what you did, what you expected and what happened. Your ComfyUI version and the model or workflow you used help a lot. Ideas and questions go on the same board. To talk something through first, there's the [Discord](https://discord.gg/Hf7ysvDeGa).
 
 ## The feedback board
 

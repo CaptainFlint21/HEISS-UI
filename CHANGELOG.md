@@ -18,12 +18,12 @@ version opens with a `> ` summary line, which the update pill shows.
   so every bit of detail is still drawn full size. On by default, in the
   sidebar under the seed and in Settings › Features, which also installs the
   small HEISS UI Nodes pack it runs on. A seed frames a little differently
-  with Rapid, so a seed you fix yourself runs without it; "Use settings" on a
-  Rapid picture keeps it on and brings the same picture back. Based on SPEED
+  with Rapid, so a seed you fix yourself runs without it. Based on SPEED
   (Xiao et al., 2026), with an extra step after the switch that keeps the
   picture's contrast true to a run without it.
 - **RTX video upscale (NVIDIA RTX cards).** Videos get an upscale arrow, and
-  video models get 2K and 4K in the size menu: NVIDIA's RTX Video Super
+  the size menu gets an RTX upscale row (None, 2K, 4K) under Resolution for
+  video models: NVIDIA's RTX Video Super
   Resolution sharpens and cleans every frame in seconds, and keeps the sound.
   On an RTX 40-series or newer, "Smoother video" also doubles the frame rate
   at the same length. The original is always kept. Set it up in Settings ›
@@ -36,6 +36,56 @@ version opens with a `> ` summary line, which the update pill shows.
   offers the update, for git installs, zips and Manager installs alike (an
   older copy is set aside, never deleted). Settings › Features shows which
   version ComfyUI runs.
+- **Docker support.** `docker compose up --build` runs the studio in a
+  container next to your ComfyUI, keeping its data on a volume and serving
+  the gallery from ComfyUI's output folder. A plain Dockerfile (multi-stage,
+  non-root, for `docker run` without compose) and the how-to are in
+  [DOCKER.md](./docs/guides/DOCKER.md). The studio is published to this
+  computer only, and settings made in the app are kept on the data volume.
+- **Settings › Connection › Change address › Find ComfyUI on its own.** Off
+  keeps HEISS on its saved address (`HEISS_COMFY_SEARCH=0`): with a second
+  ComfyUI just for HEISS next to your main one on 8188, HEISS no longer
+  switches to the main one while its own is starting or restarting.
+- **Resolution: 2K and 4K drawn by the model itself.** On models made for
+  big pictures (Flux.2, Qwen-Image 2.1, Z-Image, Krea 2 Turbo, Ideogram 4,
+  MageFlow, Sana 2K/4K) the size menu reads **Resolution** with Default, 2K
+  and 4K: the model makes the picture at that size (the aspect you picked,
+  long side 2048 or 4096), faster and with nothing in between, and **Use
+  upscaler** switches to SeedVR2. Elsewhere it stays **Smart upscale**
+  through SeedVR2, with **Draw at 2K directly** where the model may manage
+  it ("Results vary"), and nothing where it plainly breaks (SD 1.5/2). The
+  list and its sources are in
+  [MODELS.md](./docs/guides/MODELS.md#native-2k4k). Picking a SeedVR2 size
+  without SeedVR2 still opens its setup.
+- **A reference that only guides.** On Flux.2 and Qwen-Image 2.1, hover the
+  first reference for Edit or Ref. Edit works as before: the result keeps
+  that image's size. Ref keeps your size and aspect, and the image still
+  guides the picture, 2K/4K included. A REF tag on the thumbnail shows it.
+  The inpainting brush belongs to Edit, so it hides while Ref is on.
+
+### Changed
+- **A tighter size menu.** Default and the ratio it already is share one
+  row, rows are more compact, and 2.35:1 is gone.
+- **A 2K/4K pick survives a reference.** It is skipped while an edited
+  reference or a painted mask sets the size, and back afterwards, together
+  with the aspect you had.
+- **Time estimates learn each size on its own.** A 2K or 4K draw is estimated
+  from your 2K and 4K runs once there are two, not bent from your 1K ones;
+  a stretch at 2K no longer pushes your 1K timings out, and a few misses at
+  one size no longer hide the estimate at another. Edits and image-to-image
+  runs, and the tiled decode a native size uses, are learned apart too.
+
+### Fixed
+- **Flux.2 Klein 9B picks a Qwen3 8B text encoder that runs it.** MiniMax
+  Music's encoder looks like Qwen3 8B from outside and could become the
+  default, failing every run with "mat1 and mat2 shapes cannot be
+  multiplied". A text encoder saved with the draft that no longer fits
+  falls back to the default instead of failing the run.
+- **Smart upscale finds SeedVR2 weights kept outside ComfyUI/models**, on any
+  folder from `extra_model_paths.yaml`. 4K no longer falls back to an int8
+  build the SeedVR2 node can't load.
+- **Settings › Features › Inpainting says where its two dials are:** in the
+  sidebar's Basics, under the image, not under Advanced.
 
 ## [0.17.0] - 2026-10-09
 

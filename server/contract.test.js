@@ -247,3 +247,15 @@ for (const snapshot of snapshots) {
 test("there is at least one ComfyUI snapshot to check against", () => {
   assert.ok(snapshots.length >= 1);
 });
+
+test("every image family says which sizes it draws itself, and SD 1.5/2 draw neither", () => {
+  for (const [id, family] of Object.entries(families)) {
+    if (family.kind !== "image") continue;
+    assert.equal(typeof family.native, "object", `${id} states native`);
+    for (const [size, level] of Object.entries(family.native)) assert.ok(["2k", "4k"].includes(size) && ["yes", "maybe"].includes(level), `${id}: ${size} ${level}`);
+  }
+  assert.deepEqual(families.sd15.native, {});
+  assert.deepEqual(families.sd2.native, {});
+  assert.deepEqual(families.flux2_klein_9b.native, { "2k": "yes", "4k": "maybe" });
+  assert.deepEqual(families.sdxl.native, { "2k": "maybe" });
+});

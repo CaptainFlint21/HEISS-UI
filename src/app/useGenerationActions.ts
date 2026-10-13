@@ -7,7 +7,7 @@ import { clearLoraLibrary } from './lora-storage';
 import { retryRequest, type RetryOptions, type RetryRequest } from './retry';
 import { jobPollDelay } from './job-poll';
 import { downloadActions } from './useModelDownloads';
-import { autoUpscaleQuality } from './useUpscale';
+import { sizePlan } from './useUpscale';
 import { rtxOffered } from './rtx';
 import type { GalleryItem, Job } from './types';
 
@@ -23,7 +23,7 @@ export function useGenerationActions(view: any) {
     frames, fps, generateDisabled, generatePostingRef, height, loadGallery, loadGalleryDelta, loras, missingRequiredReference, mode,
     model, negative, prefs, hiddenSpace, hidden, prompt, sampler, scheduler, seed, rapid, rapidGuidance, setActive, setGallery,
     upsertGalleryItems, removeGalleryItems, removeGalleryItemsWhere, patchGalleryItems, setStatus, setZenSelectedId, showToast, startImage, startImageId, startImageName, steps, cfg,
-    referenceAssets, inpaint, textEncoder, textEncoders, vae, clipType, weightDtype, width, visibleGallery, outputDir, generateDisabledReason, comfyOffline, comfyRestarting, openModelSetup, retryComfyStatus, refreshModels
+    referenceAssets, inpaint, sizeTier, sizeMax, textEncoder, textEncoders, vae, clipType, weightDtype, width, visibleGallery, outputDir, generateDisabledReason, comfyOffline, comfyRestarting, openModelSetup, retryComfyStatus, refreshModels
   } = view;
   const galleryUpsert = upsertGalleryItems || ((items: GalleryItem[]) => setGallery((current: GalleryItem[]) => dedupeGalleryItems([...items, ...current])));
   const galleryRemove = removeGalleryItems || ((keys: string[]) => setGallery((current: GalleryItem[]) => current.filter((item: GalleryItem) => !keys.includes(item.id) && !keys.includes(item.url) && (!item.jobId || !keys.includes(item.jobId)))));
@@ -150,6 +150,12 @@ export function useGenerationActions(view: any) {
         : "Started video";
       setStatus(startMessage);
 
+      // A reference frames the output only when it is the image being edited (a painted mask always is).
+      const framedByReference = Boolean(currentProfile?.aspectPolicy === "reference" && (referenceAssets || []).length && (inpaint || prefs.referenceRole !== "reference"));
+      // 2K: the picked aspect drawn with its long side at 2048 (useUpscale sizePlan). Not
+      // where the output's size isn't the model's to pick: a reference that frames it, or a mask.
+      const plan = mode === "image" && !inpaint && !framedByReference ? sizePlan(sizeTier, Number(width), Number(height), currentProfile?.native, sizeMax) : null;
+      const native = plan?.draw || null;
       const requestBody: Record<string, any> = retry ? retry.body : {
         kind: mode,
         prompt,
@@ -162,8 +168,8 @@ export function useGenerationActions(view: any) {
         vae,
         clipType,
         weightDtype,
-        width,
-        height,
+        width: native ? native.width : width,
+        height: native ? native.height : height,
         steps,
         cfg,
         denoise,
@@ -180,19 +186,14 @@ export function useGenerationActions(view: any) {
         ...((rapid || rapidGuidance) && prefs.rapidSpeed && prefs.rapidSpeed !== "balanced" ? { rapidSpeed: prefs.rapidSpeed } : {}),
         loras,
         referenceAssets: (referenceAssets || []).map(({ slot, asset }: any) => ({ slot, assetId: asset.id })),
+        referenceRole: framedByReference ? "edit" : "reference",
+        // Native 2K/4K: a whole-frame decode at that size can outgrow VRAM and crawl in shared memory without failing; tiles stay on the GPU.
+        ...(native ? { tiledDecode: true } : {}),
         // A painted mask on the first reference: change only that part.
         ...(inpaint ? { inpaint } : {}),
         startImageId: canUseStartImage ? startImageId : "",
         startImageName,
         privateVault: Boolean(hiddenSpace),
-        // Smart upscale: the upscale is part of the run itself, one job in ComfyUI.
-        // Off whenever the output's size isn't the model's own to pick: a reference
-        // that dictates the framing (aspectPolicy "reference"), or a painted mask,
-        // which keeps the original image's size. The size tabs hide in both cases,
-        // but a persisted 2K/4K choice from before must not sneak an upscale in too.
-        autoUpscale: mode === "image" && !inpaint && !(currentProfile?.aspectPolicy === "reference" && (referenceAssets || []).length) && prefs.smartUpscale !== false && autoUpscaleQuality(prefs.autoUpscale)
-          ? { quality: autoUpscaleQuality(prefs.autoUpscale), faceDetail: Boolean(prefs.upscaleFaceDetail) }
-          : null,
         // RTX upscale for a video run (server/rtx.js); the server drops it where the machine can't, and says why.
         rtxVideo: mode === "video" && !hiddenSpace && prefs.smartUpscale !== false && rtxOffered() && (prefs.videoUpscale === "2k" || prefs.videoUpscale === "4k")
           ? { tier: prefs.videoUpscale, smooth: Boolean(prefs.rtxSmooth) }

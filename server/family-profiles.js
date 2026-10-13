@@ -401,6 +401,7 @@ export function familyProfiles(info, helpers) {
     const profile = buildProfile({
       mediaInputs: startSlot || referenceSlots(references),
       aspectPolicy: references ? "reference" : "manual",
+      native: variant.native || family.native,
       id: legacyProfileId(info2.family, source, name) || `${family.kind}:${info2.family}:${source}:${name}`,
       kind: family.kind,
       label: sanaLabel(name) && runner ? sanaLabel(name) : `${prettyModelName(name)} · ${family.label}`,

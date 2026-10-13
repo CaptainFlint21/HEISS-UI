@@ -214,6 +214,9 @@ function sanitizeFamilyBody(input, info, stats) {
     rapidGuidance: sanitizeRapidGuidance(input, profile, cfg, { referenceAssets, inpaint }),
     // The speed choice behind those switch points, for the picture's record; balanced is the default and goes unsaid.
     ...(RAPID_SPEED_SHIFT[input.rapidSpeed] && (input.rapid === true || input.rapidGuidance === true) ? { rapidSpeed: input.rapidSpeed } : {}),
+    // "reference": the first reference guides the picture but doesn't frame it; the picked size does.
+    // A painted mask is an edit of that image, so it keeps the image's framing.
+    referenceRole: input.referenceRole === "reference" && !input.inpaint ? "reference" : "edit",
     promptPolicy: null,
     loras: sanitizeLoras(input, info, profile, kind, 8),
     // A retry after the GPU ran out of memory while decoding; only where this ComfyUI has the node.

@@ -87,7 +87,7 @@ function RunStyleGlyph({ kind }: { kind: 'burst' | 'flow' }) {
 }
 
 /** Where HEISS UI looks for ComfyUI: test an address, then keep it. */
-function ComfyAddressRow({ current, showToast, onSaved }: { current: string; showToast: ShowToast; onSaved: () => void }) {
+function ComfyAddressRow({ current, search, showToast, onSaved }: { current: string; search: boolean; showToast: ShowToast; onSaved: () => void }) {
   const [value, setValue] = React.useState(current);
   const [busy, setBusy] = React.useState(false);
   const [note, setNote] = React.useState('');
@@ -111,7 +111,7 @@ function ComfyAddressRow({ current, showToast, onSaved }: { current: string; sho
   };
   const changed = value.trim() && value.trim() !== current;
   return (
-    <Row label="Address" description={note || 'Where ComfyUI runs. ComfyUI Desktop usually uses port 8000, a manual install 8188; on this computer both are tried.'}>
+    <Row label="Address" description={note || `Where ComfyUI runs. ComfyUI Desktop usually uses port 8000, a manual install 8188${search ? '; on this computer both are tried' : ''}.`}>
       <div className="set-address">
         <input className="set-path-input" value={value} onChange={(event) => setValue(event.target.value)} aria-label="ComfyUI address" spellCheck={false} autoComplete="off" onKeyDown={(event) => { if (event.key === 'Enter' && changed) submit(true); }} />
         <button className="btn" onClick={() => submit(false)} disabled={busy || !value.trim()}>Test</button>
@@ -148,6 +148,33 @@ function SwitchRow({ label, tag, description, checked, onChange, disabled }: { l
     <Row label={tag ? <>{label}{tag}</> : label} description={description} disabled={disabled}>
       <Switch label={label} checked={checked} onChange={onChange} disabled={disabled} />
     </Row>
+  );
+}
+
+/** Whether HEISS looks on the usual ports when its address doesn't answer. Off for a second ComfyUI kept just for HEISS. */
+function ComfySearchRow({ enabled, onSaved }: { enabled: boolean; onSaved: () => void }) {
+  const [checked, setChecked] = React.useState(enabled);
+  const [note, setNote] = React.useState('');
+  React.useEffect(() => { setChecked(enabled); }, [enabled]);
+  const change = async (next: boolean) => {
+    setChecked(next);
+    setNote('');
+    try {
+      const response = await apiFetch('/api/comfy-search', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enabled: next }) });
+      if (!response.ok) throw new Error();
+      onSaved();
+    } catch {
+      setChecked(!next);
+      setNote('Couldn’t save that. Make sure HEISS UI is running.');
+    }
+  };
+  return (
+    <SwitchRow
+      label="Find ComfyUI on its own"
+      description={note || 'When nothing answers at this address, try ports 8188 and 8000 and switch to the ComfyUI there. Turn off to stay on this address, e.g. with a second ComfyUI just for HEISS.'}
+      checked={checked}
+      onChange={change}
+    />
   );
 }
 
@@ -1035,7 +1062,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
                     ) : (
                       <InpaintSuggestions onGetModels={onGetModels} />
                     )}
-                    <Row label="Strength and edge softness" description={`While a painted image is in the prompt bar, both are in ${phoneDevice ? 'the Advanced sheet' : 'the sidebar’s Advanced tab'}. Strength is there for models that take a start image.`} />
+                    <Row label="Strength and edge softness" description={`While a painted image is in the prompt bar, both are in ${phoneDevice ? 'the Advanced sheet' : 'the sidebar’s Basics, under the image'}. Strength is there for models that take a start image.`} />
                     <InpaintDemo />
                   </>
                 ) : null}
@@ -1116,7 +1143,8 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
               </Row>
               {thisComputer ? (
                 <SettingsDrawer key={health && !connected ? 'off' : 'on'} id="set-comfy-address" title="Change address" description="If ComfyUI runs on another port or computer" defaultOpen={Boolean(health && !connected && !comfyRestarting)}>
-                  <ComfyAddressRow current={health?.comfyUrl || 'http://127.0.0.1:8188'} showToast={showToast} onSaved={() => { refreshHealth(); refreshModels(false); refreshWorkflows(); }} />
+                  <ComfyAddressRow current={health?.comfyUrl || 'http://127.0.0.1:8188'} search={health?.comfySearch !== false} showToast={showToast} onSaved={() => { refreshHealth(); refreshModels(false); refreshWorkflows(); }} />
+                  <ComfySearchRow enabled={health?.comfySearch !== false} onSaved={refreshHealth} />
                 </SettingsDrawer>
               ) : (
                 <Row label="Restart ComfyUI" description="Loads new custom nodes and files, and frees memory.">

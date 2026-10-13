@@ -38,11 +38,25 @@ export type SelectedReferenceAsset = { slot: string; asset: ReferenceAsset };
 export type InpaintMask = { assetId: string; dataUrl: string };
 /** The composer's painting on its first reference slot: the current mask, and how to change it. */
 export type ReferenceInpaint = { slot: string; mask: string | null; onChange: (dataUrl: string | null) => void };
+/** What the framing reference is: the image being edited (its size is the output's) or only a reference (the picked size is). */
+export type ReferenceRole = "edit" | "reference";
+export type ReferenceRoleControl = { slot: string; value: ReferenceRole; onChange: (value: ReferenceRole) => void };
 export type PromptComposition = { prefix?: string; suffix?: string; policy?: string; version?: number };
 export type GenerationSettings = Record<string, string | number | boolean | null | undefined | LoraSelection[]>;
 export type UpscaleQuality = "fast" | "balanced" | "high";
 /** Smart upscale in the size menu: every new image comes out at this size, upscaled as part of its run. */
-export type AutoUpscale = "none" | "2k" | "4k";
+/**
+ * The size menu's pick (useUpscale sizePlan says how a run gets there).
+ * "-native"/"-upscale" are an older switch's picks, still read as their size.
+ */
+export type AutoUpscale = "none" | "2k" | "4k" | "2k-native" | "4k-native" | "2k-upscale" | "4k-upscale";
+/** A custom size kept in the size menu, under a name you can change. */
+export type SavedSize = { id: string; name: string; width: number; height: number };
+/** A Smart upscale size a model may also draw itself. */
+export type NativeSize = "2k" | "4k";
+/** "yes": documented, drawn natively by default. "maybe": mixed reports, SeedVR2 by default. */
+export type NativeLevel = "yes" | "maybe";
+export type NativeSupport = Partial<Record<NativeSize, NativeLevel>>;
 export type UpscaleState = {
   status: "running" | "done" | "error" | "canceled";
   jobId?: string;
@@ -88,6 +102,8 @@ export type SelectOption = { label: string; value: string };
 export type Profile = {
   id: string;
   kind: Mode;
+  /** Whether this model draws 2K/4K itself, per size (family catalog). */
+  native?: NativeSupport;
   label: string;
   displayName?: string;
   description?: string;
@@ -175,7 +191,9 @@ export type Models = {
 export type Paths = { outputDir?: string; galleryDir?: string; workflowsDir?: string };
 export type OutputFolderState = "empty" | "missing" | "not-folder" | "ok" | "match" | "mismatch";
 export type OutputFolderReport = { path: string; state: OutputFolderState; media?: number; capped?: boolean; checked?: number; found?: number; looksLikeComfy?: boolean; source?: "comfy" | "common" };
-export type Health = { ok: boolean; comfyUrl?: string; error?: string; /** Admin allowed: on the computer HEISS UI runs on, or a signed-in device trusted with admin. */ thisComputer?: boolean; /** Open on the computer HEISS UI runs on itself. */ atComputer?: boolean };
+export type Health = { ok: boolean; comfyUrl?: string; /** Off: stay on comfyUrl instead of looking on the usual ports (HEISS_COMFY_SEARCH=0). */ comfySearch?: boolean; error?: string; /** Admin allowed: on the computer HEISS UI runs on, or a signed-in device trusted with admin. */ thisComputer?: boolean; /** Open on the computer HEISS UI runs on itself. */ atComputer?: boolean; /** The last run stopped without anyone meaning it to (server/exit-record.js); this computer only. */ previousExit?: PreviousExit };
+/** Why the last run of HEISS UI stopped, written down by whoever saw it. */
+export type PreviousExit = { at: number; who: "server" | "vite" | "launcher" | "unknown"; reason: string; code: number | null; signal: string | null; detail?: string; lastSeen?: number };
 /** How a ComfyUI restart ended, as the server saw it: how long it took, and which node packs it brought in or failed to load. */
 export type RestartResult = { startedAt: number; endedAt: number; outcome: 'back' | 'failed'; durationMs?: number | null; newPacks?: string[]; failedPacks?: string[] };
 export type ComfyStatus = { connected: boolean; url?: string; latencyMs?: number; version?: string; device?: string; error?: string; checking?: boolean; checked?: boolean; /** A restart HEISS asked for is under way: not answering is expected. */ restarting?: boolean; restartStartedAt?: number; restartElapsedMs?: number; /** How long restarts usually take here, once they agree. */ restartTypicalMs?: number; /** The restart that ended in the last two minutes. */ lastRestart?: RestartResult; /** ComfyUI turned up at this other usual address, which is now saved. */ found?: string; /** Other addresses on this computer HEISS UI tries by itself. */ nearby?: string[] };
@@ -286,6 +304,10 @@ export type Preferences = {
   inpainting: boolean;
   upscaleQuality: UpscaleQuality;
   autoUpscale: AutoUpscale;
+  /** Custom sizes kept from the size menu ("Save size"), for every model. */
+  savedSizes?: SavedSize[];
+  /** Models whose first reference frames the output: edit that image, or only take it as a reference. */
+  referenceRole?: ReferenceRole;
   upscaleFaceDetail: boolean;
   /** RTX upscaling for every new video (NVIDIA RTX only): "none", "2k" or "4k" (server/rtx.js). */
   videoUpscale: AutoUpscale;

@@ -1,6 +1,6 @@
 # HEISS model search
 
-A standalone demo is at `/model-search-demo/`. The site’s existing `npm run site` preview serves it. No build step or dependencies are required.
+The landing page carries it; `npm run site` previews it. No build step or dependencies are required.
 
 ## Drop into a website page
 
@@ -17,14 +17,14 @@ For a catalog at another URL:
 <heiss-model-search catalog-url="/your-model-catalog.json"></heiss-model-search>
 ```
 
-The component uses Shadow DOM to scope its styles. It inherits HEISS tokens `--sans`, `--mono`, `--pixel`, `--text`, `--text-2`, `--text-3`, `--surface*`, `--line*`, `--action*` and `--ember`, with fallback fonts/colors. The demo uses the website’s self-hosted fonts via `styles.css`. Give its parent a width and section spacing; the component caps itself at 720px. The landing page places it under the hero (`#models`).
+The component uses Shadow DOM to scope its styles. It inherits HEISS tokens `--sans`, `--mono`, `--pixel`, `--text`, `--text-2`, `--text-3`, `--surface*`, `--line*`, `--action*` and `--ember`, with fallback fonts/colors. Give its parent a width and section spacing; the component caps itself at 720px. The landing page places it under the hero (`#models`).
 
 ## Behavior
 
 - Index built once, after the catalog loads. No search API, tracking, AI requests, or dependencies.
 - Unicode/accent normalization, punctuation/underscore tolerance, joined names, family aliases, creator/title/version terms, token prefixes, one-edit typos and adjacent transpositions. Exact names and aliases rank first.
 - The empty state is just the field. Results appear as you type; a family name lists that family's checkpoints.
-- Results are one grouped list that scrolls inline and loads 30 more as you near the end. Rows link straight to Civitai. NSFW checkpoints carry a small tag; clicking one opens a short heads-up under the row with the link.
+- Results are one grouped list that scrolls inline and loads 30 more as you near the end. Rows link straight to Civitai. NSFW checkpoints carry a small tag; clicking one opens a short heads-up under the row with the link. Two icon tags come from the family: an image for families that take reference images (`references`) and a brush for families that can inpaint (`inpaint: true`, set by `scripts/build-model-support-search.mjs` with the same rule as the server's `canInpaint`).
 - `/` focuses search, Enter opens the first result, arrows move through results, Escape clears.
 - Motion: keyed rows (kept rows slide to their new place, new ones fade in with a short stagger), animated result height and a clear-button pop. All off under reduced motion.
 - External URLs restricted to HTTPS Civitai model pages, opened with `noopener noreferrer`.

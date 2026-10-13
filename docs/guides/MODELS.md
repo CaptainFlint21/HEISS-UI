@@ -130,6 +130,12 @@ catalog, so a family that is described correctly needs no UI work.
    gain little get `rapid: false` on their variant. Families with their own
    graph (`sampling: "h3"`, `"sana"`, …) never get it.
 
+   Inpainting needs no field of its own. An image family that takes a picture
+   in through the shared graph (`img2img` or `references`) can inpaint;
+   one with its own sampling style (Ideogram 4, MageFlow, Sana, H3, Wan's
+   pair) or `ownLoaders` cannot. `canInpaint` in `server/family-profiles.js`
+   decides, and the model menu shows the result.
+
 9. **Tests** in `server/model-families.test.js`. Cover detection from a
    header, each variant's defaults, what a missing part or pack reports, and
    the graph's nodes and inputs. The fixtures write tiny fake safetensors
@@ -155,3 +161,40 @@ catalog, so a family that is described correctly needs no UI work.
 - Everything a model needs is named in its `missing` list with a way to get
   it: a Download button, node install steps, or a copyable command. A model
   that is not ready never runs.
+
+## Native 2K/4K
+
+`native` on a family (or a variant) says, per size, whether the model draws 2K
+or 4K itself:
+
+- **`"yes"`**: its makers document that size. 2K/4K draw natively by default,
+  the size menu reads **Resolution · Default / 2K / 4K**, and a **Use upscaler**
+  switch picks SeedVR2 instead.
+- **`"maybe"`**: reports are mixed or missing. SeedVR2 stays the default (the
+  menu reads **Smart upscale · None / 2K / 4K**), and a **Draw at 2K directly**
+  switch, marked "Results vary with this model", tries it.
+- **Left out**: the model plainly breaks there. No switch.
+
+Current entries:
+
+- **Nothing:** SD 1.5 and SD 2.x (trained at 512/768, duplicated subjects at
+  large sizes are long settled), Sana 512px.
+- **2K maybe:** models documented at about 1 MP: SDXL and its finetunes,
+  Pony V7/AuraFlow (768-1536), SD 3.5, Flux.1 (BFL: 1.6 MP max), Chroma,
+  HiDream, Qwen-Image (1328), Anima, Lumina 2.0, ERNIE-Image, Krea 2 Raw
+  (trained up to 1K), Sana 1024 and Sprint. 4K (3-4x past their training) is
+  left out.
+- **2K yes, 4K maybe:** Flux.2 Dev and Klein (BFL: up to 4 MP), Qwen-Image 2.1
+  (native 2K), Z-Image (up to 2048²), Krea 2 Turbo (1K-2K), Ideogram 4 (up to
+  2048), MageFlow (512-2048, any aspect), Sana 2K. No hands-on 4K reports.
+- **2K and 4K yes:** Sana 4K.
+
+A new family states its own `native`; leaving it out means none.
+
+## Supported families
+
+The table of supported families is in the [README](../../README.md#supported-models).
+
+## Formats
+
+**GGUF** files run through the [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) node pack, which installs in one click. The current ComfyUI-GGUF doesn't load Krea 2, Ideogram 4, MiniMax H3 or Qwen-Image 2.1 GGUFs yet, so use their safetensors versions for now ([details](../gguf-research.md)). Nunchaku, NF4 and other formats that need their own loader nodes aren't supported. For those, get them running in ComfyUI first and bring them over as [your own workflow](#bring-your-own-workflow).

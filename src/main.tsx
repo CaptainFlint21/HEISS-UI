@@ -4,10 +4,10 @@ import { showToastTone as showToast, toast } from "./app/toast";
 import "./styles.css";
 
 import { useModelFolders } from './app/useModelFolders';
-import type { ComfyStatus, GalleryItem, Health, LoraSelection, MediaInput, Mode, Models, OutputFolderReport, Paths, Preferences, Profile, InpaintMask, ReferenceAsset, ReferenceInpaint, SelectedReferenceAsset, TouchGesture, UpdatePrefs, UpdateStatus, WorkflowPreferences, WorkflowSummary } from './app/types';
+import type { AutoUpscale, PreviousExit, SavedSize, ComfyStatus, GalleryItem, Health, LoraSelection, MediaInput, Mode, Models, OutputFolderReport, Paths, Preferences, Profile, InpaintMask, ReferenceAsset, ReferenceInpaint, ReferenceRole, ReferenceRoleControl, SelectedReferenceAsset, TouchGesture, UpdatePrefs, UpdateStatus, WorkflowPreferences, WorkflowSummary } from './app/types';
 import { fallbackAspectPresets } from './app/constants';
 import { apiJson, copyImage, copyText, loadDraft, loadPrefs, referenceAssetFromGallery } from './app/api';
-import { characterMeta, clampText, formatElapsed, generationDetailEntries, settingMax, textLength, titleFromPrompt } from './app/format';
+import { characterMeta, clampText, clientJobUuid, formatElapsed, generationDetailEntries, settingMax, textLength, titleFromPrompt } from './app/format';
 import { useGalleryColumnCount } from './app/gallery';
 import { normalizeLoras, sameBaseModel } from './app/loras';
 import { arrangeReferences, withReference, withoutReferences } from './app/referenceSlots';
@@ -33,7 +33,8 @@ import { useRunSettling } from './app/useRunSettling';
 import { runTitle, type Run } from './app/runs';
 import { useGalleryStore } from './app/useGalleryStore';
 import { emptySearch, searchActive, useFavorites, type GallerySearch } from './app/favorites';
-import { autoUpscaleQuality, upscaleDisplayThumbnail, upscaleDisplayUrl, useUpscale } from './app/useUpscale';
+import { sizePlan, upscaleDisplayThumbnail, upscaleDisplayUrl, upscaleSize, useUpscale } from './app/useUpscale';
+import { closestPreset, fitRatio, snapSide } from './app/sizing';
 import { useHidden, type HiddenIntent } from './app/useHidden';
 import { flyInto, hiddenDockTarget } from './app/hiddenMotion';
 import { useVisibleInterval } from './hooks/use-visible-interval';
@@ -56,6 +57,11 @@ const StablePhoneAdvancedControls = memoLatest(PhoneAdvancedControls);
 
 /** Snap a raw pixel dimension to something ComfyUI will accept: a multiple of the
  *  workflow's step (default 8), clamped to its width/height range. */
+/** Custom's range for one side: 256 to 4096, on the model's step or 16, whichever is coarser. */
+function customSideLimits(meta: Record<string, number> = {}) {
+  return { min: 256, max: Math.min(Number(meta.max) || 4096, 4096), step: Math.max(Number(meta.step) || 0, 16) };
+}
+
 function snapDimension(value: number, meta: Record<string, number> = {}): number {
   const step = meta.step || 8;
   const min = meta.min ?? 64;
@@ -750,7 +756,6 @@ function App() {
       showToast("Couldn’t save settings", "error");
     }
   }
-
   function setZenMode(enabled: boolean) {
     if (!enabled) {
       setZenControls(false);
@@ -827,6 +832,19 @@ function App() {
       .catch(() => null);
   }
 
+  /** How the last run stopped, when nobody meant it to: told once per stop, on this computer. */
+  function tellPreviousExit(exit: PreviousExit) {
+    const key = `heiss-ui:exit-told:${exit.at}`;
+    try { if (localStorage.getItem(key)) return; localStorage.setItem(key, "1"); } catch { /* told this session at most */ }
+    const when = new Date(exit.lastSeen || exit.at).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
+    const details = [`HEISS UI stopped: ${exit.reason}`, `Last seen running: ${new Date(exit.lastSeen || exit.at).toISOString()}`, exit.code !== null ? `Exit code: ${exit.code}` : "", exit.signal ? `Signal: ${exit.signal}` : "", exit.detail ? `\nLast output:\n${exit.detail}` : ""].filter(Boolean).join("\n");
+    showToast("HEISS UI stopped unexpectedly last time", "warning", {
+      description: `${exit.reason.replace(/\.?$/, ".")} Last seen running ${when}.`,
+      duration: 20_000,
+      action: { label: "Copy details", onClick: () => { void copyToClipboard(details, "Details copied"); } }
+    });
+  }
+
   function refreshHealth() {
     // 503 only means ComfyUI isn't answering: its body still says whether
     // this is the computer that looks after HEISS UI, so read it either way.
@@ -837,6 +855,7 @@ function App() {
         setHealth(data);
         if (typeof data.thisComputer === "boolean") setThisComputer(data.thisComputer);
         if (typeof data.atComputer === "boolean") setAtComputer(data.atComputer);
+        if (data.previousExit) tellPreviousExit(data.previousExit);
       })
       .catch((error) => setHealth({ ok: false, error: error instanceof Error && !/fetch|load failed/i.test(error.message) ? error.message : "Can’t reach HEISS UI. Make sure it’s running." }));
   }
@@ -1032,14 +1051,25 @@ function App() {
   function applyProfile(profile: Profile, setModelId = true) {
     const nextReferenceInput = imageInputsForProfile(profile)[0];
     if (setModelId) setModel(profile.id);
-    setCustomSize(false);
+    // A custom size is yours, so it stays across models of the same kind, fitted to the new one's limits.
+    const keepCustom = customSize && profile.kind === mode;
+    if (!keepCustom) setCustomSize(false);
     setTextEncoder(String(profile.defaults.textEncoder || ""));
     setTextEncoders((profile.encoderSlots || []).map((slot) => slot.default));
     setVae(String(profile.defaults.vae || ""));
     setClipType(String(profile.defaults.clipType || ""));
     setWeightDtype(String(profile.defaults.weightDtype || "default"));
-    setWidth(Number(profile.defaults.width || 1024));
-    setHeight(Number(profile.defaults.height || 1024));
+    if (keepCustom) {
+      const fitted = { width: snapSide(width, customSideLimits(profile.constraints?.width)), height: snapSide(height, customSideLimits(profile.constraints?.height)) };
+      setWidth(fitted.width);
+      setHeight(fitted.height);
+      if (fitted.width !== width || fitted.height !== height) {
+        showToast(`Custom size fitted to ${profile.displayName || profile.label || "this model"}: ${fitted.width} × ${fitted.height}`, "default", { description: `${width} × ${height} is past what it takes.` });
+      }
+    } else {
+      setWidth(Number(profile.defaults.width || 1024));
+      setHeight(Number(profile.defaults.height || 1024));
+    }
     setSteps(Number(profile.defaults.steps || profile.constraints?.steps?.default || (profile.kind === "video" ? prefs.defaultVideoSteps : prefs.defaultImageSteps)));
     setCfg(Number(profile.defaults.cfg || profile.constraints?.cfg?.default || 1));
     setSampler(String(profile.defaults.sampler || "euler_ancestral"));
@@ -1124,6 +1154,117 @@ function App() {
     setHeight(preset.h);
   }
 
+  /* The size menu (components.tsx AspectPicker). Default and 2K start from a
+     preset; Custom is any width and height. Moving between them keeps what's
+     on screen as close as it can: into Custom at the size you were seeing,
+     out of it to the preset nearest its shape. */
+  function chooseSizeTier(tier: "none" | "2k" | "custom") {
+    if (tier === "custom") {
+      if (customSize) return;
+      const shown = sizePlan(sizeTier, width, height, currentProfile?.native, sizeMax).final;
+      setWidth(snapSide(shown.width, customLimits.width));
+      setHeight(snapSide(shown.height, customLimits.height));
+      setCustomSize(true);
+      return;
+    }
+    if (customSize) {
+      const defaults = currentProfile?.defaults || {};
+      const defaultPreset = { label: "Default", value: "default", w: Number(defaults.width || 1024), h: Number(defaults.height || 1024) };
+      const preset = closestPreset([defaultPreset, ...aspectOptions], { width, height });
+      if (preset) { setWidth(preset.w); setHeight(preset.h); }
+      setCustomSize(false);
+    }
+    chooseAutoUpscale(tier);
+  }
+  /** A ratio row while in Custom: that shape at about the same area. */
+  function applyCustomRatio(ratio: number) {
+    const size = fitRatio(ratio, width * height, customLimits.width, customLimits.height, 16);
+    setWidth(size.width);
+    setHeight(size.height);
+  }
+  /* Saved custom sizes (the size menu's "Save size"): the studio's, on the
+     server (/api/sizes), so every device and every model has the same list.
+     Named Custom, Custom 2, … in turn; picking one puts it in Custom, fitted
+     to this model's limits; removing one can be undone from its toast.
+     Changes show at once and are sent behind; another device's arrive when
+     this page comes back into view. */
+  const [savedSizes, setSavedSizesState] = useState<SavedSize[]>([]);
+  const savedSizesRef = useRef<SavedSize[]>([]);
+  function updateSavedSizes(change: (current: SavedSize[]) => SavedSize[]) {
+    const next = change(savedSizesRef.current);
+    savedSizesRef.current = next;
+    setSavedSizesState(next);
+    apiJson<{ sizes: SavedSize[] }>("/api/sizes", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ sizes: next }) })
+      .catch(() => showToast("Couldn’t save your sizes", "error", { description: "They’re kept on this page until it reloads." }));
+  }
+  useEffect(() => {
+    let alive = true;
+    const load = () => apiJson<{ sizes: SavedSize[] }>("/api/sizes").then((data) => {
+      if (!alive) return;
+      const sizes = Array.isArray(data.sizes) ? data.sizes : [];
+      // Sizes saved in this browser before they lived on the server move over, once.
+      const local = loadPrefs().savedSizes || [];
+      if (local.length) {
+        const known = new Set(sizes.map((item) => item.id));
+        savedSizesRef.current = sizes;
+        updateSavedSizes((current) => [...current, ...local.filter((item) => !known.has(item.id))]);
+        setPrefsState((current) => {
+          const { savedSizes: _moved, ...rest } = current;
+          try { localStorage.setItem("heiss-ui-prefs", JSON.stringify(rest)); } catch { /* moved either way */ }
+          return rest;
+        });
+        return;
+      }
+      savedSizesRef.current = sizes;
+      setSavedSizesState(sizes);
+    }).catch(() => null);
+    load();
+    const onVisible = () => { if (document.visibilityState === "visible") load(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { alive = false; document.removeEventListener("visibilitychange", onVisible); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  function saveCustomSize() {
+    if (savedSizesRef.current.some((item) => item.width === width && item.height === height)) return;
+    updateSavedSizes((current) => {
+      const names = new Set(current.map((item) => item.name));
+      let name = "Custom";
+      for (let n = 2; names.has(name); n += 1) name = `Custom ${n}`;
+      return [...current, { id: clientJobUuid(), name, width, height }];
+    });
+  }
+  function renameSavedSize(id: string, name: string) {
+    const next = name.trim().slice(0, 32);
+    if (!next) return;
+    updateSavedSizes((current) => current.map((item) => item.id === id ? { ...item, name: next } : item));
+  }
+  function removeSavedSize(id: string) {
+    const index = savedSizesRef.current.findIndex((item) => item.id === id);
+    if (index < 0) return;
+    const removed = savedSizesRef.current[index];
+    updateSavedSizes((current) => current.filter((item) => item.id !== id));
+    showToast(`Removed “${removed.name}”`, "removed", {
+      action: { label: "Undo", onClick: () => updateSavedSizes((current) => {
+        if (current.some((item) => item.id === removed.id)) return current;
+        const restored = [...current];
+        restored.splice(Math.min(index, restored.length), 0, removed);
+        return restored;
+      }) }
+    });
+  }
+  function pickSavedSize(saved: SavedSize) {
+    const fitted = { width: snapSide(saved.width, customLimits.width), height: snapSide(saved.height, customLimits.height) };
+    setCustomDimensions(fitted);
+    if (fitted.width !== saved.width || fitted.height !== saved.height) {
+      showToast(`“${saved.name}” fitted to this model: ${fitted.width} × ${fitted.height}`, "default", { description: `It’s saved as ${saved.width} × ${saved.height}, past what ${currentProfile?.displayName || currentProfile?.label || "this model"} takes.` });
+    }
+  }
+  function setCustomDimensions(next: { width: number; height: number }) {
+    setWidth(next.width);
+    setHeight(next.height);
+    setCustomSize(true);
+  }
+
   const modelProfiles = useMemo(() => {
     if (!models) return [];
     const favorites = new Set(workflowPreferences.favorites || []);
@@ -1140,6 +1281,15 @@ function App() {
   }, [mode, models, workflowPreferences]);
 
   const currentProfile = useMemo(() => models?.profiles.find((profile) => profile.id === model) || null, [model, models]);
+  /* A text encoder saved with the draft can stop fitting its slot (a rescan, a sharper
+     file check): fall back to the slot's default instead of sending a pick the server rejects. */
+  useEffect(() => {
+    const slots = currentProfile?.encoderSlots || [];
+    if (!slots.length) return;
+    const fitting = slots.map((slot, index) => slot.options.includes(textEncoders[index]) ? textEncoders[index] : slot.default);
+    if (fitting.some((name, index) => name !== textEncoders[index])) setTextEncoders(fitting);
+    if (textEncoder && !slots[0].options.includes(textEncoder)) setTextEncoder(slots[0].default);
+  }, [currentProfile, textEncoders, textEncoder]);
   const toggleModelFavoriteRef = useRef<(id: string) => void>(() => undefined);
   const modelMenu = useMemo(() => ({
     favorites: workflowPreferences.favorites || [],
@@ -1194,12 +1344,28 @@ function App() {
   /* Workflows may declare that a reference image dictates the output framing
      (aspectPolicy: "reference"). When one is selected we hide the manual aspect
      and size controls and let the reference's own dimensions drive generation. */
-  const referenceForAspect = currentProfile?.aspectPolicy === "reference"
+  const framingReference = currentProfile?.aspectPolicy === "reference"
     ? composerReferenceAssets.find((item) => item.slot === referenceInput?.id)?.asset || null
     : null;
+  // Only an image being edited frames the output; a painted mask always edits it.
+  const referenceRole: ReferenceRole = activeInpaintMask ? "edit" : prefs.referenceRole === "reference" ? "reference" : "edit";
+  const referenceForAspect = referenceRole === "edit" ? framingReference : null;
   const aspectLocked = Boolean(referenceForAspect && referenceForAspect.width > 0 && referenceForAspect.height > 0);
+  // The size picked before a reference took over, put back when it lets go (same model only).
+  const sizeBeforeLock = useRef<{ model: string; width: number; height: number; customSize: boolean } | null>(null);
   useEffect(() => {
-    if (!aspectLocked || !referenceForAspect) return;
+    if (!aspectLocked || !referenceForAspect) {
+      const before = sizeBeforeLock.current;
+      sizeBeforeLock.current = null;
+      if (before && before.model === model) {
+        setWidth(before.width);
+        setHeight(before.height);
+        setCustomSize(before.customSize);
+      }
+      return;
+    }
+    // Kept from before the first lock only: on another model the size is already the reference's.
+    if (!sizeBeforeLock.current) sizeBeforeLock.current = { model, width, height, customSize: Boolean(customSize) };
     setCustomSize(false);
     const pixels = Number(currentProfile?.defaults.width || 1024) * Number(currentProfile?.defaults.height || 1024);
     const scale = prefs.autoResizeInputs === false ? 1 : Math.min(1, Math.sqrt(pixels / (referenceForAspect.width * referenceForAspect.height)));
@@ -1208,12 +1374,8 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aspectLocked, referenceForAspect?.id, model, prefs.autoResizeInputs]);
   /* A reference that dictates the framing, or a painted mask, takes the size
-     tabs (and Smart upscale with them) off the composer: the reference's own
-     size is what gets made. The saved 2K/4K pick has to go with them, not
-     just hide, so taking the reference off again doesn't bring it back. */
-  useEffect(() => {
-    if ((aspectLocked || activeInpaintMask) && prefs.autoUpscale && prefs.autoUpscale !== "none") setPrefs({ autoUpscale: "none" });
-  }, [aspectLocked, activeInpaintMask, prefs.autoUpscale]);
+     tabs off the composer and the run skips 2K/4K (useGenerationActions). The
+     saved pick stays, so it is back once the reference is gone or only guides. */
   const frameMeta = currentProfile?.constraints?.frames || {};
   const countMeta = currentProfile?.constraints?.count || {};
   const stepsMeta = currentProfile?.constraints?.steps || {};
@@ -1225,6 +1387,10 @@ function App() {
   const promptRemaining = promptLimit ? Math.max(0, promptLimit - textLength(prompt)) : undefined;
   const profileOptions = currentProfile?.options || {};
   const aspectValue = `${width}x${height}`;
+  // The size menu's tab: Custom is the size as typed; Default and 2K start from a preset (2K for images only).
+  const sizeTier: AutoUpscale = customSize || mode !== "image" ? "none" : upscaleSize(prefs.autoUpscale);
+  const sizeMax = Math.min(Number(widthMeta.max) || 8192, Number(heightMeta.max) || 8192);
+  const customLimits = { width: customSideLimits(widthMeta), height: customSideLimits(heightMeta) };
   const defaultAspectSize = `${Number(currentProfile?.defaults.width || (mode === "video" ? 512 : 1024))}x${Number(currentProfile?.defaults.height || (mode === "video" ? 288 : 1024))}`;
   const aspectPickerValue = aspectValue === defaultAspectSize ? "default" : customSize || !aspectOptions.some((item) => item.value === aspectValue) ? "free" : aspectValue;
   const galleryColumnCount = useGalleryColumnCount();
@@ -1246,12 +1412,15 @@ function App() {
   // What Generate would take with these settings, the way generate() would send them.
   const estimateCount = mode === "image" && currentProfile?.capabilities?.variations === false ? 1 : count;
   const separateRuns = mode === "image" && prefs.variationQueueMode === "separate";
+  // Estimated the way generate() sends it: at the size it's drawn at.
+  const estimateSize = sizePlan(sizeTier, Number(width), Number(height), currentProfile?.native, sizeMax).draw || { width, height };
   const generationEstimate = useGenerationEstimate({
-    mode, model: currentProfile?.model || model, profileId: currentProfile?.id || model, family: currentProfile?.family || '', width, height, steps,
+    mode, model: currentProfile?.model || model, profileId: currentProfile?.id || model, family: currentProfile?.family || '', width: estimateSize.width, height: estimateSize.height, steps,
     count: separateRuns ? 1 : estimateCount, runs: separateRuns ? estimateCount : 1, frames: mode === "video" ? frames : 0, revision: runningCount,
-    upscale: mode === "image" && prefs.smartUpscale !== false ? autoUpscaleQuality(prefs.autoUpscale) || '' : '', upscaleFaceDetail: Boolean(prefs.upscaleFaceDetail),
     rapid: rapid.use,
-    guidance: rapid.guidance
+    guidance: rapid.guidance,
+    // Learned apart on the server: runs that read images, and a native size's tiled decode.
+    refs: composerReferenceAssets.length, tiled: estimateSize.width !== width || estimateSize.height !== height
   });
   // Every Restart ComfyUI button asks first when it would stop running work.
   useEffect(() => {
@@ -1454,7 +1623,7 @@ function App() {
 
 
   const generationActions = useGenerationActions({
-    active, canUseStartImage, confirmAction, count, currentProfile, denoise, frames, fps, generateDisabled, generatePostingRef, height, loadGallery, loadGalleryDelta, loras, missingRequiredReference, mode, model, negative, prefs, hiddenSpace, hidden, prompt, referenceAssets: composerReferenceAssets, inpaint: activeInpaintMask ? { mask: activeInpaintMask.dataUrl, strength: inpaintStrength, feather: inpaintFeather } : null, sampler, scheduler, seed, rapid: rapid.use, rapidGuidance: rapid.guidance, setActive, setGallery, upsertGalleryItems, removeGalleryItems, removeGalleryItemsWhere, patchGalleryItems, setStatus, setZenSelectedId, showToast, startImage, startImageId, startImageName, steps, cfg, textEncoder, textEncoders, vae, clipType, weightDtype, width, visibleGallery, outputDir: paths.outputDir, generateDisabledReason, comfyOffline: Boolean(comfyStatus.checked && !comfyStatus.connected && !comfyStatus.checking), comfyRestarting: Boolean(comfyStatus.restarting),
+    active, canUseStartImage, confirmAction, count, currentProfile, denoise, frames, fps, generateDisabled, generatePostingRef, height, loadGallery, loadGalleryDelta, loras, missingRequiredReference, mode, model, negative, prefs, hiddenSpace, hidden, prompt, referenceAssets: composerReferenceAssets, inpaint: activeInpaintMask ? { mask: activeInpaintMask.dataUrl, strength: inpaintStrength, feather: inpaintFeather } : null, sizeTier, sizeMax, sampler, scheduler, seed, rapid: rapid.use, rapidGuidance: rapid.guidance, setActive, setGallery, upsertGalleryItems, removeGalleryItems, removeGalleryItemsWhere, patchGalleryItems, setStatus, setZenSelectedId, showToast, startImage, startImageId, startImageName, steps, cfg, textEncoder, textEncoders, vae, clipType, weightDtype, width, visibleGallery, outputDir: paths.outputDir, generateDisabledReason, comfyOffline: Boolean(comfyStatus.checked && !comfyStatus.connected && !comfyStatus.checking), comfyRestarting: Boolean(comfyStatus.restarting),
     openModelSetup: () => setWorkflowGalleryOpen(true),
     retryComfyStatus,
     refreshModels
@@ -1465,22 +1634,6 @@ function App() {
     draft: { prompt, negative, seed, rapidSeed, mode, model, width, height, steps, cfg, count, loras }, active, deleteItem, doneGallery: zenGallery, generate, generateDisabled, height, lastTapRef, lastTouchRef, mode, models, prefs, setActive, setCfg, setClipType, setCount, setCustomSize, setDenoise, setFps, setFrames, setHeight, setIsDraggingViewer, setLoras: setLorasWithMemory, setMode, setModel, setNegative, setPrompt, setSampler, setScheduler, setSeed, setRapidSeed, setShowDetails, setStartImage, setStartImageId, setStartImageName, setSteps, setTextEncoder, setTextEncoders, setVae, setViewerPan, setViewerZoom, setWeightDtype, setWidth, setZenSelectedId, showToast, touchGestureRef, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, visibleGallery, width, zenItem, zenStripDragRef, zenStripRef, viewerGallery
   });
   const { resetViewer, openItem, applyAllSettings, applyLoras, moveZen, moveViewer, goLatestZen, submitZenPrompt, startZenStripDrag, dragZenStrip, stopZenStripDrag, selectZenItem, zoomViewer, wheelViewer, clickViewer, startViewerDrag, dragViewer, stopViewerDrag, startViewerTouch, moveViewerTouch, endViewerTouch } = viewerActions;
-
-  // "Vary this": the output's prompt and settings with a new seed, generated as soon as they are in.
-  const varyPending = useRef(false);
-  function varyItem(item: GalleryItem) {
-    if (!applyAllSettings(item, { vary: true })) {
-      showToast("Its model isn’t installed, so it can’t be varied.", "error");
-      return;
-    }
-    setActive(null);
-    varyPending.current = true;
-  }
-  useEffect(() => {
-    if (!varyPending.current) return;
-    varyPending.current = false;
-    generate();
-  });
 
   // A prompt to start from, or a surprise: into the box, ready to send.
   function fillPrompt(text: string) {
@@ -1573,7 +1726,7 @@ function App() {
   // The same settings as the sidebar, laid out for the phone's Advanced sheet.
   const phoneAdvancedControls = <StablePhoneAdvancedControls view={sidebarView} />;
 
-  const baseView = { viewerGallery, gallerySearch, setGallerySearch, toggleFavorite, seed, setSeed, galleryGroups, settleVersion, stackRuns, openRuns, setRunOpen, unstackRun, active, applyAllSettings, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, checkForUpdates, restartForUpdate, restartHeiss, restarting, justUpdated, clearJustUpdated: () => setJustUpdated(""), setUpdatePrefs, refreshUpdateStatus, confirmAction, clearAllCache, clearFailedItems, clearGallery, clickViewer, comfyStatus, copyToClipboard, copyItemToClipboard, count, countMeta, currentProfile, customSize, deleteItem, deleteItems, doneGallery, zenGallery, gallery, galleryColumnCount, galleryLoaded, galleryCrossing, galleryRevision, galleryStageRef, galleryTotalApprox, generate, generateDisabled, generateDisabledReason, goLatestZen, hasMoreGallery, health, height, heightMeta, importWorkflowFile, installUpdate, isDraggingViewer, isMobile, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, now, onGalleryScroll, openItem, openOutputFolder, paths, prefs, hidden, hiddenSpace, hideItems, unhideItems, profileBadges, prompt, promptLimit, referenceAsset, referenceInput, refreshComfyStatus, retryComfyStatus, comfyRetrying, comfyReconnectedAt, refreshHealth, refreshModels, refreshWorkflows, removeReferenceAsset, renderedGallery, resetAllSettings, resetViewer, runningCount, saveOutputDirectory, selectReferenceAsset, selectWorkflow, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowGenerationSettings, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setWorkflowPreferences, setWorkflows, setZenControls, setZenGalleryOpen, setZenMode, showDetails, showGenerationSettings, showNegativePrompt, showToast, sidebarControls, phoneAdvancedControls, startViewerDrag, startViewerTouch, status, steps, stepsMeta, stopViewerDrag, submitZenPrompt, touchGestureRef, updateBusy, updateStatus, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, workflowPreferences, workflows, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenSelectedId, zenStripDragRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, characterMeta, formatElapsed, generationDetailEntries, titleFromPrompt , zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, settings, setPrefs, upscaleStatus, upscaleUnavailableReason, upscaleSetup, upscaleInstall, upscaleBusyIds, upscaleNotices, dismissUpscaleNotice, toggleUpscale, cancelUpscale, refreshUpscaleStatus, cancelUpscaleInstall, activateUpscale, chooseAutoUpscale, upscaleDisplayUrl, modelFolders, generationEstimate, openLoras: () => { setSidebarTab('loras'); setZenControls(true); }, varyItem, fillPrompt, surprise: () => fillPrompt(surprisePrompt(prompt, mode)), starterPrompts, onStarterStarted: rememberStarter, selectStarterModel, generateKey: generateShortcut(prefs.enterToGenerate), failureFixes: generationActions.failureFixes };
+  const baseView = { viewerGallery, gallerySearch, setGallerySearch, toggleFavorite, seed, setSeed, galleryGroups, settleVersion, stackRuns, openRuns, setRunOpen, unstackRun, active, applyAllSettings, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, sizeTier, sizeMax, customLimits, chooseSizeTier, applyCustomRatio, setCustomDimensions, savedSizes, saveCustomSize, renameSavedSize, removeSavedSize, pickSavedSize, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, checkForUpdates, restartForUpdate, restartHeiss, restarting, justUpdated, clearJustUpdated: () => setJustUpdated(""), setUpdatePrefs, refreshUpdateStatus, confirmAction, clearAllCache, clearFailedItems, clearGallery, clickViewer, comfyStatus, copyToClipboard, copyItemToClipboard, count, countMeta, currentProfile, customSize, deleteItem, deleteItems, doneGallery, zenGallery, gallery, galleryColumnCount, galleryLoaded, galleryCrossing, galleryRevision, galleryStageRef, galleryTotalApprox, generate, generateDisabled, generateDisabledReason, goLatestZen, hasMoreGallery, health, height, heightMeta, importWorkflowFile, installUpdate, isDraggingViewer, isMobile, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, now, onGalleryScroll, openItem, openOutputFolder, paths, prefs, hidden, hiddenSpace, hideItems, unhideItems, profileBadges, prompt, promptLimit, referenceAsset, referenceInput, refreshComfyStatus, retryComfyStatus, comfyRetrying, comfyReconnectedAt, refreshHealth, refreshModels, refreshWorkflows, removeReferenceAsset, renderedGallery, resetAllSettings, resetViewer, runningCount, saveOutputDirectory, selectReferenceAsset, selectWorkflow, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowGenerationSettings, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setWorkflowPreferences, setWorkflows, setZenControls, setZenGalleryOpen, setZenMode, showDetails, showGenerationSettings, showNegativePrompt, showToast, sidebarControls, phoneAdvancedControls, startViewerDrag, startViewerTouch, status, steps, stepsMeta, stopViewerDrag, submitZenPrompt, touchGestureRef, updateBusy, updateStatus, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, workflowPreferences, workflows, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenSelectedId, zenStripDragRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, characterMeta, formatElapsed, generationDetailEntries, titleFromPrompt , zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, settings, setPrefs, upscaleStatus, upscaleUnavailableReason, upscaleSetup, upscaleInstall, upscaleBusyIds, upscaleNotices, dismissUpscaleNotice, toggleUpscale, cancelUpscale, refreshUpscaleStatus, cancelUpscaleInstall, activateUpscale, chooseAutoUpscale, upscaleDisplayUrl, modelFolders, generationEstimate, openLoras: () => { setSidebarTab('loras'); setZenControls(true); }, fillPrompt, surprise: () => fillPrompt(surprisePrompt(prompt, mode)), starterPrompts, onStarterStarted: rememberStarter, selectStarterModel, generateKey: generateShortcut(prefs.enterToGenerate), failureFixes: generationActions.failureFixes };
 
   // Painting on the first reference, for a model that can inpaint (InpaintStudio.tsx).
   const referenceInpaint: ReferenceInpaint | null = canInpaint && referenceInput && referenceAsset ? {
@@ -1585,7 +1738,13 @@ function App() {
   const refreshForNodes = useRef(() => {});
   refreshForNodes.current = () => { refreshModels(false); refreshWorkflows(); loadRtxStatus({ fresh: true }); };
   useEffect(() => onHeissNodesReady(() => refreshForNodes.current()), []);
-  const view = { ...baseView, loraMismatch, dismissLoraMismatch, setupTip, hideSetupTip, neverSetupTip, referenceAssets: composerReferenceAssets, referenceInputs: visibleReferenceInputs, referenceInpaint };
+  // The switch shows on the framing reference, once one is there; a painted mask settles it as an edit.
+  const referenceRoleControl: ReferenceRoleControl | null = currentProfile?.aspectPolicy === "reference" && String(currentProfile.workflow || "").startsWith("family:") && referenceInput && framingReference && !activeInpaintMask ? {
+    slot: referenceInput.id,
+    value: referenceRole,
+    onChange: (value: ReferenceRole) => setPrefs({ referenceRole: value })
+  } : null;
+  const view = { ...baseView, loraMismatch, dismissLoraMismatch, setupTip, hideSetupTip, neverSetupTip, referenceAssets: composerReferenceAssets, referenceInputs: visibleReferenceInputs, referenceInpaint, referenceRole: referenceRoleControl };
   return (
     <>
       <StudioView view={view} />

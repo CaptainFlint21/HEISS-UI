@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowUp, Dices, EyeOff, ChevronUp, CircleDotDashed, History, Images, Layers, MoveHorizontal, MoveVertical, RefreshCw, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowUp, Dices, EyeOff, ChevronUp, CircleDotDashed, History, Images, Layers, RefreshCw, SlidersHorizontal, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { LoraMismatchChip, type LoraMismatch } from './LoraMismatchChip';
 import { SetupTipChip, type SetupTip } from './SetupTipChip';
@@ -7,8 +7,10 @@ import { cn } from './format';
 import { AspectPicker, ModelPicker, NumberPicker, Skeleton, Tip, type ControlDensity, type ModelMenuState } from './components';
 import { AnimatedNumber } from './AnimatedNumber';
 import { ReferenceSlots } from './ReferenceMediaPicker';
-import type { AspectPreset, AutoUpscale, MediaInput, Profile, ReferenceAsset, ReferenceInpaint, SelectedReferenceAsset } from './types';
+import type { AspectPreset, AutoUpscale, MediaInput, Profile, SavedSize, ReferenceAsset, ReferenceInpaint, ReferenceRoleControl, SelectedReferenceAsset } from './types';
 import { estimatePhrase, formatAbout, type GenerationEstimate } from './useGenerationEstimate';
+import type { SizeTier } from './SizeMenu';
+import type { SideLimits } from './sizing';
 
 /* ---------------------------------------------------------------------------
    The density ladder
@@ -19,25 +21,22 @@ import { estimatePhrase, formatAbout, type GenerationEstimate } from './useGener
    Priority (largest kept longest): model > private > aspect > images > steps.
 --------------------------------------------------------------------------- */
 
-type ControlId = "workflow" | "private" | "negative" | "aspect" | "size" | "steps" | "variants" | "lora";
+type ControlId = "workflow" | "private" | "negative" | "aspect" | "steps" | "variants" | "lora";
 type Demotion = ControlDensity | "drawer";
 
 const LADDER: Array<[ControlId, Demotion]> = [
   ["lora", "compact"],
   ["steps", "compact"],
   ["variants", "compact"],
-  ["size", "compact"],
   ["negative", "compact"],
   ["aspect", "compact"],
   ["steps", "mini"],
   ["variants", "mini"],
-  ["size", "mini"],
   ["aspect", "mini"],
   ["private", "compact"],
   ["workflow", "compact"],
   ["steps", "drawer"],
   ["lora", "drawer"],
-  ["size", "drawer"],
   ["variants", "drawer"],
   ["aspect", "drawer"],
   ["workflow", "mini"],
@@ -50,7 +49,7 @@ type Plan = Record<ControlId, { density: ControlDensity; drawer: boolean }>;
 
 function planForLevel(level: number): Plan {
   const plan = {} as Plan;
-  (["workflow", "private", "negative", "aspect", "size", "steps", "variants", "lora"] as ControlId[])
+  (["workflow", "private", "negative", "aspect", "steps", "variants", "lora"] as ControlId[])
     .forEach((id) => { plan[id] = { density: "full", drawer: false }; });
   for (let index = 0; index < Math.min(level, LADDER.length); index += 1) {
     const [id, to] = LADDER[index];
@@ -221,10 +220,21 @@ export type ComposerBarProps = {
   aspectValue: string;
   defaultAspectSize: string;
   applyAspect: (value: string) => void;
-  /** The upscale tabs on top of the size menu: Smart upscale for pictures, RTX for video on an NVIDIA card; left out where neither applies. */
-  autoUpscale?: AutoUpscale;
-  upscaleKind?: "smart" | "rtx";
-  onAutoUpscaleChange?: (value: AutoUpscale) => void;
+  /** The size menu's tab (Default · 2K · Custom), and what Custom may be. */
+  sizeTier?: SizeTier;
+  sizeMax?: number;
+  customLimits?: { width: SideLimits; height: SideLimits };
+  chooseSizeTier?: (tier: SizeTier) => void;
+  applyCustomRatio?: (ratio: number) => void;
+  setCustomDimensions?: (size: { width: number; height: number }) => void;
+  savedSizes?: SavedSize[];
+  saveCustomSize?: () => void;
+  renameSavedSize?: (id: string, name: string) => void;
+  removeSavedSize?: (id: string) => void;
+  pickSavedSize?: (saved: SavedSize) => void;
+  /** RTX upscale for videos on an NVIDIA card, under the size menu's Resolution; left out where it doesn't apply. */
+  videoUpscale?: AutoUpscale;
+  onVideoUpscaleChange?: (value: AutoUpscale) => void;
   customSize: boolean;
   aspectLocked?: boolean;
   width: number;
@@ -253,6 +263,7 @@ export type ComposerBarProps = {
   comfyRetrying?: boolean;
   referenceInputs?: MediaInput[];
   referenceInpaint?: ReferenceInpaint | null;
+  referenceRole?: ReferenceRoleControl | null;
   loraMismatch?: LoraMismatch | null;
   onDismissLoraMismatch?: (key: string) => void;
   setupTip?: SetupTip | null;
@@ -278,13 +289,13 @@ export type ComposerBarProps = {
 export function ComposerBar(props: ComposerBarProps) {
   const {
     models, model, modelProfiles, showInpaint = true, showRapid = true, profileBadges, chooseModel, modelMenu, currentProfile, comfyOffline, comfyRestarting = false, onFindModels, onGetModels, strayModelCount, mode,
-    aspectPickerValue, aspectOptions, aspectValue, defaultAspectSize, applyAspect, autoUpscale = "none", upscaleKind = "smart", onAutoUpscaleChange,
+    aspectPickerValue, aspectOptions, aspectValue, defaultAspectSize, applyAspect, sizeTier = "none", sizeMax, customLimits, chooseSizeTier, applyCustomRatio, setCustomDimensions, savedSizes, saveCustomSize, renameSavedSize, removeSavedSize, pickSavedSize, videoUpscale = "none", onVideoUpscaleChange,
     customSize, aspectLocked = false, width, widthMeta, setWidth, height, heightMeta, setHeight,
     steps, stepsMeta, setSteps, count, countMeta, setCount, loraActiveCount,
     hiddenSpace, onOpenLoras,
     showNegativePrompt, setShowNegativePrompt, canUseNegativePrompt,
     runningCount, generateDisabled, generateDisabledReason, generate, refreshComfyStatus, comfyRetrying,
-    referenceInputs = [], referenceInpaint = null, loraMismatch = null, onDismissLoraMismatch, setupTip = null, onHideSetupTip, onNeverSetupTip, referenceAssets = [], onReferenceSelect, onReferenceRemove, onReferenceDeleteRequest, onReferenceError,
+    referenceInputs = [], referenceInpaint = null, referenceRole = null, loraMismatch = null, onDismissLoraMismatch, setupTip = null, onHideSetupTip, onNeverSetupTip, referenceAssets = [], onReferenceSelect, onReferenceRemove, onReferenceDeleteRequest, onReferenceError,
     pinnedSeed = "", onRandomSeed, generationEstimate = null, generateKey = "", onToggleHistory, historyOpen = false
   } = props;
 
@@ -310,18 +321,23 @@ export function ComposerBar(props: ComposerBarProps) {
       currentSize={aspectValue}
       defaultSize={defaultAspectSize}
       density={density}
-      upscale={autoUpscale}
-      upscaleKind={upscaleKind}
-      onUpscaleChange={onAutoUpscaleChange}
+      tier={sizeTier}
+      tiers={mode === "image" ? ["none", "2k", "custom"] : ["none", "custom"]}
+      native={currentProfile?.native}
+      sizeMax={sizeMax}
+      limits={customLimits}
+      onTierChange={chooseSizeTier}
+      onCustomRatio={applyCustomRatio}
+      onCustomSize={setCustomDimensions}
+      savedSizes={savedSizes}
+      onSaveSize={saveCustomSize}
+      onRenameSize={renameSavedSize}
+      onRemoveSize={removeSavedSize}
+      onPickSaved={pickSavedSize}
+      videoUpscale={videoUpscale}
+      onVideoUpscaleChange={onVideoUpscaleChange}
     />
   );
-
-  const sizePickers = (density: ControlDensity) => customSize && !aspectLocked ? (
-    <>
-      <NumberPicker label="Width" icon={<MoveHorizontal size={13} />} density={density} value={width} onChange={setWidth} min={widthMeta.min ?? 64} max={widthMeta.max ?? 4096} step={widthMeta.step || (mode === "video" ? 32 : 64)} size="sm" />
-      <NumberPicker label="Height" icon={<MoveVertical size={13} />} density={density} value={height} onChange={setHeight} min={heightMeta.min ?? 64} max={heightMeta.max ?? 4096} step={heightMeta.step || (mode === "video" ? 32 : 64)} size="sm" />
-    </>
-  ) : null;
 
   const stepsPicker = (density: ControlDensity) => (
     <NumberPicker label="Steps" icon={<CircleDotDashed size={14} />} density={density} value={steps} onChange={setSteps} min={stepsMeta.min || 1} max={stepsMeta.max || 150} step={stepsMeta.step || 1} size="sm" />
@@ -334,8 +350,10 @@ export function ComposerBar(props: ComposerBarProps) {
   const loraPill = (density: ControlDensity) => loraActiveCount ? (
     <Tip content={`${loraActiveCount} LoRA${loraActiveCount === 1 ? "" : "s"} active. Click to edit`}>
       <button type="button" className={cn("lora-pill", density !== "full" && `is-density-${density}`)} onClick={onOpenLoras} aria-label={`${loraActiveCount} LoRA${loraActiveCount === 1 ? "" : "s"} active, edit LoRAs`}>
-        {density === "full" ? "LoRA" : <Layers size={13} />}
+        {/* "2 LoRAs" where there's room; the icon and the count where there isn't. */}
+        {density === "full" ? null : <Layers size={13} />}
         <AnimatedNumber value={loraActiveCount} />
+        {density === "full" ? <span className="lora-pill-word">{loraActiveCount === 1 ? "LoRA" : "LoRAs"}</span> : null}
       </button>
     </Tip>
   ) : null;
@@ -346,7 +364,6 @@ export function ComposerBar(props: ComposerBarProps) {
     ["workflow", "Model", workflowPicker],
     ["private", "Hidden", privateToggle],
     ["aspect", "Aspect ratio", aspectPicker],
-    ["size", "Size", sizePickers],
     ["steps", "Steps", stepsPicker],
     ["variants", "Images", variantsPicker],
     ["lora", "LoRA", loraPill]
@@ -363,7 +380,7 @@ export function ComposerBar(props: ComposerBarProps) {
     <>
       <LoraMismatchChip mismatch={loraMismatch} onOpenLoras={onOpenLoras} onDismiss={(key) => onDismissLoraMismatch?.(key)} />
       <SetupTipChip tip={loraMismatch ? null : setupTip} onHide={(id) => onHideSetupTip?.(id)} onNever={(id) => onNeverSetupTip?.(id)} />
-      <ReferenceSlots inputs={referenceInputs} inpaint={referenceInpaint} selected={referenceAssets} onSelect={onReferenceSelect} onRemove={onReferenceRemove} confirmDelete={onReferenceDeleteRequest} onError={onReferenceError} />
+      <ReferenceSlots inputs={referenceInputs} inpaint={referenceInpaint} role={referenceRole} selected={referenceAssets} onSelect={onReferenceSelect} onRemove={onReferenceRemove} confirmDelete={onReferenceDeleteRequest} onError={onReferenceError} />
       <AnimatePresence initial={false}>
         {drawerOpen && tucked.length ? (
         <motion.div
@@ -437,7 +454,6 @@ export function ComposerBar(props: ComposerBarProps) {
         <div className="zen-inline-settings" data-fluid-group>
           {inline("workflow", workflowPicker)}
           {inline("aspect", aspectPicker)}
-          {inline("size", sizePickers)}
           {inline("steps", stepsPicker)}
           {inline("variants", variantsPicker)}
           {inline("lora", loraPill)}
