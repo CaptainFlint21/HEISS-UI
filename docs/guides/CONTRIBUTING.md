@@ -58,6 +58,12 @@ Before every release, on a real ComfyUI with GPU:
 3. Unpack the release zip (`npm run package` builds it) in a fresh folder and start it with its launcher.
 4. Check that **Settings › About** shows the version and the update check answers.
 
+### The 1.0 branch
+
+`feature/1.0` collects the work for 1.0 (Rapid, RTX video upscale, the inpaint stitch, workflow import v2) on top of the latest release. Releases before 1.0 (0.18, 0.19, …) are still cut as below, and each one is merged into `feature/1.0` straight after its tag (`git merge --no-ff vX.Y.Z`), so the branch never falls behind. A 1.0 feature that should ship sooner goes into a 0.x release on its own, behind its switch. Work for 1.0 happens on short branches off `feature/1.0`, one worktree per session, merged back often.
+
+HEISS UI Nodes moves with it: the pack's `main` carries every node, and `server/node-packs.js` pins its commit and `PACK_VERSION` (docs/heiss-nodes.md).
+
 ### Cutting a release
 
 To cut a release, from an up-to-date `main` with the notes written under **Unreleased**, opened by a one-line summary:
