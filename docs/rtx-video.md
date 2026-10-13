@@ -1,6 +1,6 @@
 # RTX video upscale
 
-Upscales videos in seconds on NVIDIA RTX cards with NVIDIA's RTX Video Super Resolution (VSR), and can make them smoother with RTX Frame Generation. Branch: `feature/rapid` (it's a speed feature), with the nodes on `feature/rtx` of ComfyUI-HEISS-UI-Nodes.
+Upscales videos in seconds on NVIDIA RTX cards with NVIDIA's RTX Video Super Resolution (VSR), and can make them smoother with RTX Frame Generation. Branch: `feature/rapid` (it's a speed feature), with the nodes in ComfyUI-HEISS-UI-Nodes (on its `main`).
 
 **What it is, and isn't.** VSR is a fast per-frame network that sharpens and cleans what's already in a frame: compression blocks, softness, noise. It doesn't draw new detail the way SeedVR2 does. That's why it takes seconds where SeedVR2 takes many minutes. One example: tritant's README shows 464 frames to 2560×3840 in 27 s. So:
 
@@ -112,6 +112,6 @@ They draw on both nodes that came before them (both Apache-2.0):
 2. Quality defaults on real Wan, Hunyuan and H3 output: `HIGHBITRATE_HIGH` vs `HIGH`, and whether a light `DEBLUR` first pass helps soft AI video, which community reports suggest.
 3. The phone's create sheet has no video tabs yet (the gallery arrow works on phones).
 4. After NVIDIA's package installs, the install panel still suggests a restart, which isn't needed.
-5. Merge `feature/rtx` into the pack's `main` before release, so the pinned commit lives on its default branch.
+5. Installing the nodes themselves goes through the HEISS Nodes dialog (docs/heiss-nodes.md).
 6. Hidden videos.
 7. An optional "Quick" picture upscale on NVIDIA with HEISS RTX Upscale.

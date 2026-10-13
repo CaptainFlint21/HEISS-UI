@@ -71,6 +71,7 @@ import { cancelModelInstall, downloadPlan, installState, managerAvailable, manag
 import { findUpscaleTarget, startRtxUpscale, startUpscale, toggleUpscaleView } from './upscale-jobs.js';
 import { dropsAutoUpscale, planRunUpscale } from './run-upscale.js';
 import { comfyOutputName, planRunRtx, rtxCheck, rtxStatusFrom, rtxTiers } from './rtx.js';
+import { heissNodesReport, heissNodesStatusFrom, localHeissCopy } from './heiss-nodes.js';
 import { autoDetectOutputDir, detectOutputDirs, inspectOutputDir, outputDirChoice, pickFolder } from './output-folder.js';
 import { compressJson, serveApp } from './http-assets.js';
 import { describeGitError, updateCheckout } from './git-update.js';
@@ -1742,17 +1743,35 @@ app.get("/api/upscale/status", async (req, res) => {
  * doesn't, the same install panel every node pack gets.
  */
 app.get("/api/rapid/status", async (_req, res) => {
-  let info;
   try {
-    ({ info } = await loadComfyContext());
+    const status = await heissNodesStatus();
+    res.json({ ok: true, installed: status.state === "ready", setup: status.state === "ready" ? null : status.setup });
   } catch {
     res.status(503).json({ ok: false, offline: true, restarting: comfyRestarting() });
-    return;
   }
-  // Every node of the pack: an older copy with Rapid but not Rapid Guidance gets the update panel.
-  const installed = nodePacks.heiss.nodes.every((node) => hasNode(info, node));
-  const setup = installed ? null : { manager: await managerAvailable(), pack: nodePack("heiss"), autoInstall: packInstallRoutes("heiss"), ...packInstallPlan(nodePacks.heiss, comfyRootDir(), process.platform) };
-  res.json({ ok: true, installed, setup });
+});
+
+/**
+ * HEISS UI Nodes as a whole (heiss-nodes.js): install, update, restart or
+ * ready, which features run now, and the install panel while it's needed.
+ * The app's HEISS Nodes dialog asks this whenever a feature that needs the
+ * pack is touched.
+ */
+async function heissNodesStatus({ fresh = false } = {}) {
+  const { info } = await loadComfyContext({ force: fresh });
+  const status = heissNodesStatusFrom({ info, report: await heissNodesReport(), local: localHeissCopy(comfyRootDir()) });
+  if (status.state !== "ready" && status.state !== "restart") {
+    status.setup = { manager: await managerAvailable(), pack: nodePack("heiss"), autoInstall: packInstallRoutes("heiss"), ...packInstallPlan(nodePacks.heiss, comfyRootDir(), process.platform) };
+  }
+  return status;
+}
+
+app.get("/api/heiss-nodes", async (req, res) => {
+  try {
+    res.json({ ok: true, ...await heissNodesStatus({ fresh: req.query.fresh === "1" }) });
+  } catch {
+    res.status(503).json({ ok: false, offline: true, restarting: comfyRestarting(), error: "ComfyUI is offline. Start it, and HEISS checks again." });
+  }
 });
 
 // Download progress never needs ComfyUI, so it keeps reporting while ComfyUI restarts.
@@ -1861,8 +1880,9 @@ app.post("/api/upscale", async (req, res) => {
 async function rtxStatus({ fresh = false, probe = false } = {}) {
   const { info, stats } = await loadComfyContext({ force: fresh });
   const device = (stats || comfyCache.stats)?.devices?.[0] || null;
-  const check = await rtxCheck({ probe });
-  const status = rtxStatusFrom({ info, device, check });
+  const [check, report] = await Promise.all([rtxCheck({ probe }), heissNodesReport()]);
+  const nodes = heissNodesStatusFrom({ info, report, local: localHeissCopy(comfyRootDir()) });
+  const status = rtxStatusFrom({ info, device, check, nodesReady: nodes.features.find((feature) => feature.id === "rtx")?.ready });
   if (status.stage === "nodes" || status.stage === "package") {
     const id = status.stage === "nodes" ? "heiss" : "heissrtx";
     status.setup = { manager: id === "heiss" ? await managerAvailable() : false, pack: nodePack(id), autoInstall: packInstallRoutes(id), ...packInstallPlan(nodePacks[id], comfyRootDir(), process.platform) };

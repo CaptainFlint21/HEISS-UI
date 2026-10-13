@@ -29,6 +29,13 @@ version opens with a `> ` summary line, which the update pill shows.
   at the same length. The original is always kept. Set it up in Settings ›
   Features › Smart upscale: the HEISS UI Nodes, then NVIDIA's package (about
   0.5 GB). Not shown on Macs or AMD cards, and not for Hidden videos yet.
+- **HEISS UI Nodes install themselves the first time you need them.** Touch
+  Rapid or RTX video upscale on a ComfyUI without HEISS's own nodes and one
+  dialog installs them all, waits for ComfyUI to restart, and carries on with
+  what you were doing. When a newer HEISS needs newer nodes, the same dialog
+  offers the update, for git installs, zips and Manager installs alike (an
+  older copy is set aside, never deleted). Settings › Features shows which
+  version ComfyUI runs.
 
 ## [0.17.0] - 2026-10-09
 

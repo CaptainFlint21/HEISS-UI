@@ -52,8 +52,10 @@ export function ShellCommand({ plan, showToast }: { plan: ShellPlan; showToast: 
  * in Manager's list, or clones it and installs its requirements itself when
  * ComfyUI runs on this computer. Progress comes from polling the server.
  */
-function QuickInstall({ pack, onDone, showToast, onRestarted, afterRestart }: {
+function QuickInstall({ pack, onDone, showToast, onRestarted, afterRestart, verb = 'Install', resumeFinished = true }: {
   pack: NodePackInfo & { id: string };
+  verb?: 'Install' | 'Update';
+  resumeFinished?: boolean;
   onDone: (state: PackInstallState | null) => void;
   showToast: ShowToast;
   onRestarted: () => void;
@@ -65,7 +67,8 @@ function QuickInstall({ pack, onDone, showToast, onRestarted, afterRestart }: {
   const url = `/api/node-packs/${encodeURIComponent(pack.id)}/install`;
   // An install started earlier (another panel, a reload) keeps reporting here.
   useEffect(() => {
-    apiJson<{ install: PackInstallState | null }>(url).then(({ install }) => { if (alive.current && install) follow(install); }).catch(() => null);
+    // A finished one only where nothing else knows the pack's state (the HEISS Nodes dialog does, from disk).
+    apiJson<{ install: PackInstallState | null }>(url).then(({ install }) => { if (alive.current && install && (resumeFinished || install.status === 'running')) follow(install); }).catch(() => null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url]);
   const follow = async (first: PackInstallState) => {
@@ -117,7 +120,7 @@ function QuickInstall({ pack, onDone, showToast, onRestarted, afterRestart }: {
     <div className="node-quick">
       <button type="button" className="btn is-primary" onClick={() => start()} disabled={running}>
         {running ? <RotateCw size={14} className="is-spinning" /> : <Download size={14} />}
-        {running ? state.step || 'Installing…' : state?.status === 'error' ? 'Try again' : `Install ${pack.name}`}
+        {running ? state.step || (verb === 'Update' ? 'Updating…' : 'Installing…') : state?.status === 'error' ? 'Try again' : `${verb} ${pack.name}`}
         {running ? null : <BetaTag />}
       </button>
       {running ? <p className="upscale-fine">{state.route === 'manager' ? 'Installing through ComfyUI-Manager. ' : 'Installing with ComfyUI’s own Python. '}It can take a few minutes.</p> : null}
@@ -134,8 +137,12 @@ function QuickInstall({ pack, onDone, showToast, onRestarted, afterRestart }: {
  * ComfyUI's own Python. Manager 4 ships switched off (ComfyUI needs
  * --enable-manager), so without it the terminal route opens first.
  */
-export function NodeInstall({ pack, plan, managerHint, autoInstall, showToast, onRestarted, afterRestart = '' }: {
+export function NodeInstall({ pack, plan, managerHint, autoInstall, showToast, onRestarted, afterRestart = '', verb = 'Install', resumeFinished = true }: {
   pack: NodePackInfo;
+  /** The one-click button's word: Update for a pack that is there but older (HeissNodesDialog). */
+  verb?: 'Install' | 'Update';
+  /** Show an install that finished earlier (default); off where the caller reads the pack's state itself. */
+  resumeFinished?: boolean;
   /** The one-click routes the server has for this pack; without one only the manual steps show. */
   autoInstall?: PackAutoInstall;
   plan?: ShellPlan & { cloned?: boolean; needsGit?: boolean; exact?: boolean; customNodesDir?: string; python?: string };
@@ -166,7 +173,7 @@ export function NodeInstall({ pack, plan, managerHint, autoInstall, showToast, o
   if (canQuick && !manual && !quickError) {
     return (
       <div className="node-install">
-        <QuickInstall pack={pack as NodePackInfo & { id: string }} showToast={showToast} onRestarted={onRestarted} afterRestart={afterRestart} onDone={(state) => { if (state?.status === 'error') setQuickError(state.error || 'The install stopped.'); if (state?.status === 'done') setInstalled(true); }} />
+        <QuickInstall pack={pack as NodePackInfo & { id: string }} verb={verb} resumeFinished={resumeFinished} showToast={showToast} onRestarted={onRestarted} afterRestart={afterRestart} onDone={(state) => { if (state?.status === 'error') setQuickError(state.error || 'The install stopped.'); if (state?.status === 'done') setInstalled(true); }} />
         {installed ? null : <button type="button" className="comfy-restart-link node-install-manual" onClick={() => setManual(true)}>Install it yourself instead</button>}
       </div>
     );

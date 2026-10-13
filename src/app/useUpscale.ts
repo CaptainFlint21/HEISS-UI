@@ -5,6 +5,7 @@ import type { ShowToast } from './toast';
 import { mediaUrl } from './mediaUrl';
 import { formatLeft, useRunClock } from './GenerationProgress';
 import { loadRtxStatus, rtxOffered } from './rtx';
+import { requireHeissNodes } from './heissNodes';
 
 /** The gallery keeps the original as the record; only the view swaps. */
 export function upscaleDisplayUrl(item: GalleryItem) {
@@ -412,8 +413,14 @@ export function useUpscale({ gallery, prefs, showToast, loadGalleryDelta, patchG
 
   const upscaleItem = useCallback(async (item: GalleryItem) => {
     if (!canUpscaleItem(item) || item.upscale?.status === "running") return;
-    // Videos skip SeedVR2's setup: the server checks RTX and says what's missing as a notice.
+    // Videos skip SeedVR2's setup. Without HEISS UI Nodes the HEISS Nodes dialog installs them and then
+    // upscales; anything else missing (NVIDIA's package) comes back from the server as a notice.
     if (item.type === "video") {
+      const rtx = await loadRtxStatus({ fresh: true });
+      if (rtx?.stage === "nodes") {
+        requireHeissNodes("rtx", () => { runUpscale(item); });
+        return;
+      }
       await runUpscale(item);
       return;
     }

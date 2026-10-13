@@ -20,7 +20,8 @@ import { runTitle, type Run } from './runs';
 import { UpscaleArrow } from './UpscaleArrow';
 import { UpscaleCompare } from './UpscaleCompare';
 import { canUpscaleItem, shortLeft, upscaledWithRun, upscaleTooltip, useUpscaleClock } from './useUpscale';
-import { useRtxOffered } from './rtx';
+import { loadRtxStatus, useRtxOffered } from './rtx';
+import { requireHeissNodes } from './heissNodes';
 import { UpscaleSetupDialog } from './UpscaleDialogs';
 import { ModelFoldersDialog } from './ModelFoldersDialog';
 import { UpscaleNoticePopover } from './UpscaleNotice';
@@ -123,7 +124,14 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const smartUpscaleTabs = mode === "image" && prefs.smartUpscale !== false;
   const rtxTabs = mode === "video" && prefs.smartUpscale !== false && rtxVideos;
   const upscaleTier = rtxTabs ? prefs.videoUpscale || "none" : prefs.autoUpscale || "none";
-  const onUpscaleTier = smartUpscaleTabs ? view.chooseAutoUpscale : rtxTabs ? (tier: string) => setPrefs({ videoUpscale: tier }) : undefined;
+  // A video tier on a ComfyUI without HEISS UI Nodes: the HEISS Nodes dialog first, then the tier is on.
+  const chooseVideoTier = async (tier: string) => {
+    if (tier === "none") return setPrefs({ videoUpscale: tier });
+    const rtx = await loadRtxStatus();
+    if (rtx?.stage === "nodes") return requireHeissNodes("rtx", () => setPrefs({ videoUpscale: tier }));
+    setPrefs({ videoUpscale: tier });
+  };
+  const onUpscaleTier = smartUpscaleTabs ? view.chooseAutoUpscale : rtxTabs ? chooseVideoTier : undefined;
   const strayModelCount = modelFolders?.strayCount || 0;
   const canUseNegativePrompt = currentProfile?.capabilities?.negativePrompt !== false;
   const { confirmAction, referenceAssets, referenceInputs, referenceInpaint, retryComfyStatus, comfyRetrying, comfyReconnectedAt } = view;

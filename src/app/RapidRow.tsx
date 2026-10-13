@@ -3,6 +3,7 @@ import { cn } from './format';
 import { Switch } from './SettingsDialog';
 import { Tip } from './components';
 import { rapidLabel, type RapidStatus } from './rapid.js';
+import { requireHeissNodes } from './heissNodes';
 
 /**
  * HEISS Rapid in the composer (docs/rapid.md): the switch, and why it is off
@@ -20,6 +21,9 @@ const explainer = 'Starts each picture at half size, and drops prompt guidance f
 /** Rapid as a whole; the parts keep their own settings underneath. */
 const enabledAll = (prefs: RapidView['prefs']) => prefs.rapidAll !== false;
 
+/** "Set up": the HEISS Nodes dialog installs the pack, then Rapid is on. */
+const setUp = (setPrefs: RapidView['setPrefs']) => requireHeissNodes('rapid', () => setPrefs({ rapidAll: true }));
+
 /** What the next run gets, in a few words. */
 function onLabel(rapid: RapidView['rapid']) {
   if (rapid.status !== 'on') return rapidLabel(rapid.status);
@@ -27,7 +31,7 @@ function onLabel(rapid: RapidView['rapid']) {
 }
 
 export function SidebarRapidRow({ view }: { view: RapidView }) {
-  const { rapid, prefs, setPrefs, openSettings } = view;
+  const { rapid, prefs, setPrefs } = view;
   if (rapid.status === 'model') return null;
   const enabled = enabledAll(prefs);
   return (
@@ -39,19 +43,19 @@ export function SidebarRapidRow({ view }: { view: RapidView }) {
         </span>
       </Tip>
       {rapid.status === 'install'
-        ? <button type="button" className="btn is-ghost rapid-row-setup" onClick={() => openSettings?.('features')}>Set up</button>
+        ? <button type="button" className="btn is-ghost rapid-row-setup" onClick={() => setUp(setPrefs)}>Set up</button>
         : <Switch size="sm" label={`Rapid, ${onLabel(rapid)}`} checked={enabled} onChange={(next) => setPrefs({ rapidAll: next })} />}
     </div>
   );
 }
 
 export function PhoneRapidRow({ view }: { view: RapidView }) {
-  const { rapid, prefs, setPrefs, openSettings } = view;
+  const { rapid, prefs, setPrefs } = view;
   if (rapid.status === 'model') return null;
   if (rapid.status === 'install') {
     return (
       <div className="phone-group">
-        <button type="button" className="phone-row" onClick={() => openSettings?.('features')}>
+        <button type="button" className="phone-row" onClick={() => setUp(setPrefs)}>
           <Zap size={20} /><span>Rapid<small className="is-setup">Faster pictures · tap to set up</small></span>
         </button>
       </div>

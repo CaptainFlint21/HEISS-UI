@@ -28,6 +28,7 @@ import { HuggingFaceTokenSettings } from './HuggingFaceToken';
 import { OtherDevicesGroup } from './OtherDevices';
 import { TrashRow } from './TrashRow';
 import { loadRtxStatus, rtxStageLine, useRtxStatus } from './rtx';
+import { loadHeissNodes, openHeissNodes, useHeissNodes } from './heissNodes';
 import type { ShowToast } from './toast';
 
 export const SETTINGS_SECTIONS = [
@@ -344,9 +345,13 @@ function RtxVideoSettings({ prefs, setPrefs, showToast }: { prefs: Preferences; 
       >
         <button className="btn is-ghost" disabled={checking} onClick={check}><RefreshCw size={14} /> {checking ? 'Checking…' : 'Check again'}</button>
       </Row>
-      {status.setup ? (
+      {status.stage === 'nodes' ? (
         <div className="set-node-install">
-          <NodeInstall pack={status.setup.pack} plan={status.setup} managerHint={status.setup.manager} autoInstall={status.setup.autoInstall} showToast={showToast} onRestarted={() => { loadRtxStatus({ fresh: true, probe: true }); }} afterRestart={status.stage === 'nodes' ? 'Then NVIDIA’s package is the last step.' : 'Then check again here.'} />
+          <button type="button" className="btn is-primary" onClick={() => openHeissNodes('rtx')}><Download size={14} /> Set up HEISS UI Nodes</button>
+        </div>
+      ) : status.setup ? (
+        <div className="set-node-install">
+          <NodeInstall pack={status.setup.pack} plan={status.setup} managerHint={status.setup.manager} autoInstall={status.setup.autoInstall} showToast={showToast} onRestarted={() => { loadRtxStatus({ fresh: true, probe: true }); }} afterRestart="Then check again here." />
         </div>
       ) : null}
       <SwitchRow
@@ -360,18 +365,39 @@ function RtxVideoSettings({ prefs, setPrefs, showToast }: { prefs: Preferences; 
   );
 }
 
+/**
+ * HEISS UI Nodes at a glance: the version ComfyUI runs, and one button that
+ * opens the HEISS Nodes dialog to install, update or check. Features ask by
+ * themselves the first time they're used; this is for looking on purpose.
+ */
+function HeissNodesRow() {
+  const { status, offline } = useHeissNodes();
+  React.useEffect(() => { loadHeissNodes(); }, []);
+  const line = offline ? 'ComfyUI is offline.'
+    : !status ? 'Checking…'
+    : status.state === 'ready' ? `Version ${status.loadedVersion}, up to date.`
+    : status.state === 'restart' ? 'Updated. Restart ComfyUI to load it.'
+    : status.state === 'update' ? `Version ${status.loadedVersion || 'unknown'} in ComfyUI; this HEISS needs ${status.requiredVersion}.`
+    : 'Not installed. Features that need them ask the first time you use them.';
+  const label = status?.state === 'install' ? 'Set up' : status?.state === 'update' ? 'Update' : 'Details';
+  return (
+    <Row label="HEISS UI Nodes" description={<>HEISS’s own small add-on for ComfyUI, behind Rapid and RTX video upscale.<br />{line}</>}>
+      <button className={cn('btn', (status?.state === 'install' || status?.state === 'update') ? 'is-primary' : 'is-ghost')} onClick={() => openHeissNodes()}>{label}</button>
+    </Row>
+  );
+}
+
 /** The HEISS UI Nodes install for Rapid, asked for only while some model is waiting on it. */
-function RapidSetup({ showToast, onInstalled }: { showToast: ShowToast; onInstalled: () => void }) {
+function RapidSetup({ showToast: _showToast, onInstalled: _onInstalled }: { showToast: ShowToast; onInstalled: () => void }) {
   const [state, setState] = React.useState<RapidSetupState | null>(null);
-  const load = React.useCallback(() => {
+  React.useEffect(() => {
     apiJson<RapidSetupState>('/api/rapid/status').then(setState).catch(() => setState(null));
   }, []);
-  React.useEffect(load, [load]);
   if (!state?.setup) return null;
-  const { setup } = state;
+  // Installed and kept current in one place: the HEISS Nodes dialog (models refresh when it's done).
   return (
     <div className="set-node-install">
-      <NodeInstall pack={setup.pack} plan={setup} managerHint={setup.manager} autoInstall={setup.autoInstall} showToast={showToast} onRestarted={() => { load(); onInstalled(); }} afterRestart="Then Rapid is on for every model listed here." />
+      <button type="button" className="btn is-primary" onClick={() => openHeissNodes('rapid')}><Download size={14} /> Set up HEISS UI Nodes</button>
     </div>
   );
 }
@@ -910,6 +936,9 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
 
         {section === 'features' ? (
           <>
+          <Group>
+            <HeissNodesRow />
+          </Group>
           <Group>
             <SettingsDrawer
               id="set-feature-rapid"

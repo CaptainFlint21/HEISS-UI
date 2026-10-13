@@ -59,10 +59,11 @@ export function rtxSmooth(value, frameGeneration) {
  * false on anything but an NVIDIA card, and then nothing anywhere mentions it.
  * `device` is ComfyUI's /system_stats device; `check` the pack's own answer.
  */
-export function rtxStatusFrom({ info = {}, device = null, check = null } = {}) {
+export function rtxStatusFrom({ info = {}, device = null, check = null, nodesReady } = {}) {
   const kind = device ? gpuKind(device) : "";
   const nodes = missingNodes(info, nodePacks.heissrtx.nodes);
-  const nodesInstalled = !nodes.length;
+  // The pack's version decides when it's known (heiss-nodes.js); node names alone otherwise.
+  const nodesInstalled = typeof nodesReady === "boolean" ? nodesReady : !nodes.length;
   const offered = kind === "nvidia" || Boolean(check?.device);
   const base = { offered, nodesInstalled, missingNodes: nodes, packageInstalled: Boolean(check?.nvvfx), ready: false, frameGeneration: Boolean(check?.frameGeneration), device: check?.device || null, torch: check?.torch || "", cuda: check?.cuda || "", reason: "" };
   if (!offered) return { ...base, stage: "unsupported", reason: kind === "apple" ? "RTX upscaling needs an NVIDIA RTX card; Macs don't have one." : "RTX upscaling needs an NVIDIA RTX card." };

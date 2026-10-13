@@ -14,6 +14,9 @@ import { arrangeReferences, withReference, withoutReferences } from './app/refer
 import { deleteLoraStack, loraFamilyKey, loraFavorites, loraRecents, loraStacks, recordLoraRecents, rememberActiveLoras, rememberedLoraStrength, rememberLoraStrengths, renameLoraStack, saveLoraStack, startLoraSync, subscribeLoraLibrary, subscribeLoraSync, toggleLoraFavorite, updateLoraStack, type LoraSnapshot, type LoraSyncStatus } from './app/lora-storage';
 import { useConfirmation } from './app/useConfirmation';
 import { StudioView } from './app/StudioView';
+import { HeissNodesDialog } from './app/HeissNodesDialog';
+import { onHeissNodesReady } from './app/heissNodes';
+import { loadRtxStatus } from './app/rtx';
 import { DeviceGate } from './app/DeviceGate';
 import { CrashBoundary } from './app/CrashScreen';
 import { TooltipProvider } from './components/ui/tooltip';
@@ -1578,10 +1581,15 @@ function App() {
     mask: activeInpaintMask?.dataUrl || null,
     onChange: (dataUrl: string | null) => setInpaintMask(dataUrl ? { assetId: referenceAsset.id, dataUrl } : null)
   } : null;
+  // HEISS UI Nodes just became ready (heissNodes.ts): models learn Rapid, and RTX asks again.
+  const refreshForNodes = useRef(() => {});
+  refreshForNodes.current = () => { refreshModels(false); refreshWorkflows(); loadRtxStatus({ fresh: true }); };
+  useEffect(() => onHeissNodesReady(() => refreshForNodes.current()), []);
   const view = { ...baseView, loraMismatch, dismissLoraMismatch, setupTip, hideSetupTip, neverSetupTip, referenceAssets: composerReferenceAssets, referenceInputs: visibleReferenceInputs, referenceInpaint };
   return (
     <>
       <StudioView view={view} />
+      <HeissNodesDialog showToast={showToast} />
       {confirmationDialog}
     </>
   );

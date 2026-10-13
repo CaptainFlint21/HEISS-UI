@@ -103,6 +103,17 @@ function run(state, command, args, cwd, env = process.env) {
   });
 }
 
+/** A pack's own version line (`PACK_VERSION = 3` in its versionFile) as it is on disk; 0 when there is none. */
+export function packVersionOnDisk(folder, pack) {
+  if (!pack?.versionFile) return 0;
+  try {
+    const match = /^PACK_VERSION\s*=\s*(\d+)\s*$/m.exec(fs.readFileSync(path.join(folder, pack.versionFile), "utf8"));
+    return match ? Number(match[1]) : 0;
+  } catch {
+    return 0;
+  }
+}
+
 /** The packages a node pack must never replace: what ComfyUI's PyTorch stands on. */
 export const heldPackages = ["torch", "torchvision", "torchaudio", "numpy"];
 
@@ -128,6 +139,17 @@ async function installLocally(state, pack) {
   if (!root || !python) throw new Error("ComfyUI isn't on this computer. Use the terminal steps instead.");
   const customNodes = path.join(root, "custom_nodes");
   const target = path.join(customNodes, pack.folder);
+  // An older copy that isn't a git checkout (a zip, or Manager's registry install) can't be moved to the reviewed
+  // commit: set it aside, where ComfyUI won't load it (".disabled"), and install fresh. Nothing is deleted.
+  if (pack.update && pack.version && fs.existsSync(target) && !fs.existsSync(path.join(target, ".git"))) {
+    const onDisk = packVersionOnDisk(target, pack);
+    if (onDisk < pack.version) {
+      const aside = path.join(customNodes, `${pack.folder}-v${onDisk || "old"}-${Date.now()}.disabled`);
+      state.step = "Setting the older copy aside";
+      fs.renameSync(target, aside);
+      state.log += `Moved the older ${pack.folder} (version ${onDisk || "unknown"}) to ${path.basename(aside)}.\n`;
+    }
+  }
   if (!fs.existsSync(target)) {
     state.step = "Downloading the nodes";
     try {

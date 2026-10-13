@@ -73,17 +73,26 @@ export function packInstallPlan(pack, root = comfyRootDir(), platform = process.
   const checkout = pack.commit ? `git -C ${pack.folder} checkout --detach ${pack.commit}` : "";
   // A pack that moves with HEISS (`update`) is brought to its reviewed commit when an older copy is there.
   const update = cloned && pack.update && checkout ? [`git -C ${pack.folder} fetch origin`, checkout] : [];
-  const fetchSteps = cloned ? update : [clone, ...(checkout ? [checkout] : [])];
+  // A pack that moves with HEISS, on a computer HEISS can't look into (ComfyUI elsewhere): one command that works
+  // whether an older copy is there or not, cloning only when it isn't, then bringing it to the reviewed commit.
+  const either = !cloned && pack.update && checkout;
+  const ensure = {
+    sh: `{ [ -d "${pack.folder}" ] || ${clone}; }`,
+    powershell: `if (-not (Test-Path -LiteralPath "${pack.folder}")) { ${clone} }`,
+    cmd: `(if not exist "${pack.folder}" ${clone})`
+  };
+  const fetchFor = (shell) => (either ? [ensure[shell], `git -C ${pack.folder} fetch origin`, checkout] : cloned ? update : [clone, ...(checkout ? [checkout] : [])]);
+  const fetchSteps = fetchFor("sh");
   const commands = [];
   if (win) {
     const exe = python ? `"${python}"` : "python";
     const embedded = isEmbeddedPython(python);
     const pip = `${exe} ${pipArgs(python).join(" ")} install -r ${requirements}${index}`;
     // -LiteralPath: a plain Set-Location reads [ ] in a folder name as wildcards.
-    const steps = [`Set-Location -LiteralPath "${folder}"`, ...fetchSteps, ...(embedded ? ['$env:PYTHONNOUSERSITE = "1"'] : []), `${python ? "& " : ""}${pip}`];
+    const steps = [`Set-Location -LiteralPath "${folder}"`, ...fetchFor("powershell"), ...(embedded ? ['$env:PYTHONNOUSERSITE = "1"'] : []), `${python ? "& " : ""}${pip}`];
     commands.push({ shell: "powershell", label: "PowerShell", command: steps.map((step, i) => (i ? `if ($?) { ${step} }` : step)).join("; ") });
     // Quoted whole, or cmd keeps the space before && in the value.
-    commands.push({ shell: "cmd", label: "Command Prompt", command: [`cd /d "${folder}"`, ...fetchSteps, ...(embedded ? ['set "PYTHONNOUSERSITE=1"'] : []), pip].join(" && ") });
+    commands.push({ shell: "cmd", label: "Command Prompt", command: [`cd /d "${folder}"`, ...fetchFor("cmd"), ...(embedded ? ['set "PYTHONNOUSERSITE=1"'] : []), pip].join(" && ") });
   } else {
     const exe = python ? `"${python}"` : "python3";
     commands.push({ shell: "sh", label: "Terminal", command: [`cd "${folder}"`, ...fetchSteps, `${exe} -m pip install -r ${requirements}${index}`].join(" && ") });

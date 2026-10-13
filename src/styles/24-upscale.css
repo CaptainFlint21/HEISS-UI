@@ -458,3 +458,12 @@
 .upscale-restart { margin-top: 10px; }
 .upscale-route-tag { margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: 10px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; background: hsl(var(--muted-foreground) / .14); color: hsl(var(--muted-foreground)); }
 .wf-restart { margin-top: 2px; }
+
+/* --------------------------------------------------------------- HEISS UI Nodes (HeissNodesDialog.tsx) */
+
+.heiss-nodes-mark { position: absolute; inset: 10% 20% 24%; width: auto; max-width: none; }
+.heiss-nodes-hero[data-stage="ready"] .heiss-nodes-mark { filter: saturate(.9) brightness(1.08); }
+.heiss-nodes-features .heiss-nodes-blurb { font-size: 12px; line-height: 1.45; color: hsl(var(--muted-foreground)); }
+.heiss-nodes-features li.is-asked { box-shadow: inset 2px 0 0 var(--ember); }
+.heiss-nodes-action { margin-top: 14px; }
+.heiss-nodes-action .upscale-watcher { margin-top: 10px; }
