@@ -18,6 +18,18 @@
  * change here, never automatic. Last reviewed 2026-09-28.
  */
 export const nodePacks = {
+  // HEISS's own nodes, more as features need them: here Inpaint Stitch (inpaint.js).
+  heiss: {
+    name: "HEISS UI Nodes",
+    repository: "https://github.com/tristmeister/ComfyUI-HEISS-UI-Nodes.git",
+    folder: "ComfyUI-HEISS-UI-Nodes",
+    commit: "aeb75286549d54603e74e547fba208bd7e32e306",
+    ref: "feature/inpaint-stitch, 2026-10-13",
+    search: "HEISS UI",
+    // It grows with HEISS: an installed older copy is updated to `commit` (pack-installer.js).
+    update: true,
+    nodes: ["HeissInpaintStitch"]
+  },
   seedvr2: {
     name: "SeedVR2 Video Upscaler",
     repository: "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler.git",

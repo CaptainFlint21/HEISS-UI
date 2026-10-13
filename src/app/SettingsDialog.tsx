@@ -761,6 +761,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
   // Inpainting ships behind a release switch; while it's off its group stays away.
   const inpaintReleased = Boolean((models as Models | null)?.features?.inpainting);
   const inpaintModels = ((modelProfiles || []) as Profile[]).filter((profile) => profile.capabilities?.inpaint);
+  const inpaintStitch = (models as Models | null)?.features?.inpaintStitch;
   const inpaintOn = prefs.inpainting !== false;
   const effort = upscaleEfforts.find((item) => item.value === (prefs.upscaleQuality || 'balanced')) || upscaleEfforts[1];
   const faceDetailReady = Boolean(upscaleStatus?.faceDetail?.nodesInstalled);
@@ -916,6 +917,15 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
                       <InpaintSuggestions onGetModels={onGetModels} />
                     )}
                     <Row label="Strength and edge softness" description={`While a painted image is in the prompt bar, both are in ${phoneDevice ? 'the Advanced sheet' : 'the sidebar’s Basics, under the image'}. Strength is there for models that take a start image.`} />
+                    {inpaintStitch?.ready ? (
+                      <Row label="Seamless edges" description="On. Edit models like Qwen-Image and Flux.2 shift and tint what they repaint a little; HEISS UI Nodes line it up and match its colour before it goes into the picture." />
+                    ) : inpaintStitch?.setup?.nodePack ? (
+                      <Row label="Seamless edges" description="Edit models like Qwen-Image and Flux.2 shift and tint what they repaint a little, which can show as doubled lines or a patch a shade off. HEISS UI Nodes line it up and match its colour before it goes into the picture." stacked>
+                        <div className="set-node-install">
+                          <NodeInstall pack={inpaintStitch.setup.nodePack} plan={inpaintStitch.setup.install} autoInstall={inpaintStitch.setup.autoInstall} showToast={showToast} onRestarted={() => refreshModels(false)} afterRestart="Then inpainting uses it by itself." />
+                        </div>
+                      </Row>
+                    ) : null}
                     <InpaintDemo />
                   </>
                 ) : null}

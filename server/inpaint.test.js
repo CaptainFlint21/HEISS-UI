@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 import { familyGraph } from "./family-graph.js";
-import { featherSigma, inpaintFiles, inpaintGeometry, inpaintNodes, maskBounds, maskBufferFromDataUrl } from "./inpaint.js";
+import { dilateMask, inpaintEdges, inpaintFiles, inpaintGeometry, inpaintNodes, maskBounds, maskBufferFromDataUrl, seamSummary } from "./inpaint.js";
 
 const objectInfo = JSON.parse(fs.readFileSync(new URL("./fixtures/object_info-comfyui-0.34.1.json", import.meta.url), "utf8"));
 const byType = (graph, type) => Object.values(graph).filter((item) => item.class_type === type);
@@ -49,9 +49,36 @@ test("the crop grows the painted area by context, stays inside the image and sna
   assert.deepEqual(small.box, { x: 0, y: 0, width: 400, height: 300 }, "an image smaller than the minimum context is used whole");
 });
 
-test("feathering scales with the box and never drops to a hard edge", () => {
-  assert.equal(featherSigma(0, { width: 512, height: 512 }), 0.6);
-  assert.ok(featherSigma(1, { width: 1024, height: 1024 }) > featherSigma(1, { width: 512, height: 512 }));
+test("the repainted band and the seam grow with the painted area; softness 0 is a hard edge", () => {
+  const small = inpaintEdges({ width: 40, height: 30 }, 0.4);
+  const large = inpaintEdges({ width: 900, height: 700 }, 0.4);
+  assert.equal(small.grow, 20, "at least 4 px plus half of a 32 px feather");
+  assert.ok(large.grow > small.grow && large.blend > small.blend);
+  assert.equal(inpaintEdges({ width: 400, height: 400 }, 0).blend, 0);
+  for (const softness of [0.2, 0.4, 1]) {
+    const edges = inpaintEdges({ width: 400, height: 400 }, softness);
+    assert.ok(edges.blend * 0.8 <= edges.grow, "the seam's middle never reaches inside the paint");
+  }
+});
+
+test("dilation is a square max filter of any radius, the border counting as empty", () => {
+  const width = 9;
+  const data = new Uint8Array(width * 7);
+  data[3 * width + 4] = 255;
+  data[0] = 120;
+  const out = dilateMask(data, width, 7, 2);
+  for (let y = 0; y < 7; y += 1) for (let x = 0; x < width; x += 1) {
+    const expected = Math.abs(x - 4) <= 2 && Math.abs(y - 3) <= 2 ? 255 : x <= 2 && y <= 2 ? 120 : 0;
+    assert.equal(out[y * width + x], expected, `${x},${y}`);
+  }
+  assert.deepEqual(Array.from(dilateMask(data, width, 7, 0)), Array.from(data));
+});
+
+test("the stitch's report reads as a few words", () => {
+  assert.equal(seamSummary([]), "");
+  assert.equal(seamSummary([{ align: { aligned: true, shift: [3, -4], scale: [1.02, 1.02] }, color: { matched: true } }]), "Lined up 5 px, 2% zoom · colour matched");
+  assert.equal(seamSummary([{ align: { aligned: false }, color: { matched: true } }]), "Colour matched");
+  assert.equal(seamSummary([{ align: { aligned: false }, color: { matched: false } }]), "Nothing to correct");
 });
 
 test("only a PNG data URL is read as a mask", () => {
@@ -86,6 +113,19 @@ test("Flux.2 Klein inpaints as an ordinary edit of the crop, then stitches only 
   assert.equal(byType(graph, "EmptyFlux2LatentImage").length, 1);
   assert.equal(byType(graph, "ReferenceLatent").length, 4, "both references still guide both conditionings");
   assert.equal(byType(graph, "ImageCompositeMasked").length, 1, "only the painted part goes back onto the original");
+});
+
+test("with HEISS UI Nodes the crop goes back through HEISS Inpaint Stitch, which lines it up and matches its colour", () => {
+  const body = { family: "flux2_klein_4b", variant: "distilled", source: "unet", model: "flux-2-klein-4b.safetensors", encoders: ["qwen_3_4b.safetensors"], vae: "flux2-vae.safetensors", prompt: "make it red", steps: 4, cfg: 1, seed: 1, width: 912, height: 1136, count: 2, referenceImages: ["crop.png"] };
+  const graph = familyGraph({ ...body, inpaint: { ...inpaint, stitchNode: true } });
+  for (const node of ["ImageCompositeMasked", "ImageScale", "RepeatImageBatch"]) assert.equal(byType(graph, node).length, 0, `${node}: the node scales and batches itself`);
+  const [stitch] = byType(graph, "HeissInpaintStitch");
+  assert.deepEqual([stitch.inputs.x, stitch.inputs.y, stitch.inputs.align, stitch.inputs.color_match], [96, 160, true, true]);
+  assert.equal(graph[stitch.inputs.original[0]].inputs.image, "original.png");
+  assert.equal(graph[stitch.inputs.mask[0]].inputs.image, "stitch.png");
+  assert.equal(graph[stitch.inputs.image[0]].class_type, "VAEDecode");
+  const [save] = byType(graph, "SaveImage");
+  assert.equal(graph[save.inputs.images[0]].class_type, "HeissInpaintStitch");
 });
 
 test("Qwen-Image 2.1 inpaints as an ordinary edit of the crop, then stitches only the painted part", () => {
@@ -124,17 +164,24 @@ test("the files: an exact crop, a hard grown sampling mask and a feathered stitc
   const { data: cropLeft } = await sharp(files.crop).extract({ left: 0, top: 0, width: 1, height: 1 }).raw().toBuffer({ resolveWithObject: true });
   assert.ok(Math.abs(cropLeft[0] - Math.floor(files.box.x / width * 255)) <= 2, "the crop starts where the box does");
 
+  // A 200 px square: a grow of 20 px, a seam of 10 px at softness 0.4.
+  assert.deepEqual(files.edges, { grow: 20, blend: 10 });
   const stitch = await sharp(files.compositeMask).extractChannel(0).raw().toBuffer({ resolveWithObject: true });
   assert.deepEqual([stitch.info.width, stitch.info.height], [512, 512]);
   const at = (x, y) => stitch.data[y * 512 + x];
+  // The painted square runs from 156 to 356 in the box (±2 for the upscaled mask's soft edge).
   assert.equal(at(256, 256), 255, "the painted middle is fully replaced");
+  assert.equal(at(158, 256), 255, "the paint's own edge is fully replaced too");
   assert.equal(at(5, 5), 0, "the context band keeps the original");
-  assert.ok(at(156 - 3, 256) > 0 && at(156 - 3, 256) < 255, "the edge fades");
+  assert.ok(at(156 - 12, 256) > 20 && at(156 - 12, 256) < 235, "the seam fades outside the paint");
+  assert.ok(at(156 - 24, 256) <= 2, "and ends where the repainted band does");
 
   const sampling = await sharp(files.samplingMask).extractChannel(0).raw().toBuffer({ resolveWithObject: true });
   const scale = files.work.width / 512;
-  assert.equal(sampling.data[Math.round(256 * scale) * files.work.width + Math.round(256 * scale)], 255);
-  assert.equal(sampling.data[Math.round(256 * scale) * files.work.width + Math.round(150 * scale)], 255, "grown a little past the painted edge, at full strength");
+  const sample = (x, y) => sampling.data[Math.round(y * scale) * files.work.width + Math.round(x * scale)];
+  assert.equal(sample(256, 256), 255);
+  assert.equal(sample(156 - 16, 256), 255, "grown past the painted edge, at full strength");
+  assert.equal(sample(156 - 26, 256), 0, "by the grow and no further");
   assert.ok(sampling.data.every((value) => value === 0 || value === 255), "hard: on or off, no half-way edge");
 
   const empty = await sharp(Buffer.alloc(400 * 300), { raw: { width: 400, height: 300, channels: 1 } }).png().toBuffer();

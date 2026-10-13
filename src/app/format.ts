@@ -173,6 +173,8 @@ export function generationDetailEntries(item: GalleryItem): GenerationDetailSect
       const count = Number(settings.count || 0);
       if (count > 1) add("Images", count);
       if (item.referenceImage || settings.referenceImageName) add("Reference", settings.referenceImageName || item.referenceImageName || "Selected");
+      // Inpainting with HEISS UI Nodes: what the stitch corrected at the seam.
+      add("Seam", settings.inpaintSeam);
     }
     if (item.type === "video") {
       add("Frames", settings.frames);

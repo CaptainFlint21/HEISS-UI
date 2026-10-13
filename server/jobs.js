@@ -16,6 +16,7 @@ import { markWorkflowUsed } from './workflow-catalog.js';
 import { remainingMs, RunTimer, slowSteps } from './generation-timing.js';
 import { generationEstimate, generationWarm, recordGeneration, recordUpscale, upscaleEstimate } from './timings.js';
 import { upscaleLeftMs, upscaleWork } from './upscale-timing.js';
+import { seamSummary } from './inpaint.js';
 
 export const jobs = new Map();
 const previewSlots = new Map();
@@ -319,6 +320,12 @@ function watchProgress(id, run, socket = openProgressSocket(id), graph = {}) {
       if (data.prompt_id && run.promptId && data.prompt_id !== run.promptId) return;
       // Anything ComfyUI says on this socket shows it is still there.
       run.alive?.();
+      // HEISS Inpaint Stitch says what it corrected; the picture's details show it.
+      if (message.type === "heiss.inpaint") {
+        const body = jobBodies.get(id);
+        if (body?.inpaint) body.inpaintSeam = seamSummary(data.results);
+        return;
+      }
       const timing = runTimings.get(id);
       if (timing?.timer) {
         timing.timer.note(message);

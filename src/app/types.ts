@@ -177,7 +177,7 @@ export type Models = {
   modelFiles?: ModelFile[];
   modelTypeChoices?: Record<ModelSource, SelectOption[]>;
   /** Release switches for features that are built but not yet public (server/features.js). */
-  features?: { inpainting?: boolean };
+  features?: { inpainting?: boolean; /** HEISS Inpaint Stitch (HEISS UI Nodes): there, or the install that brings it. */ inpaintStitch?: { ready: boolean; setup?: MissingPart } };
   textEncoders: string[];
   vaes: string[];
   clipTypes?: string[];

@@ -3,6 +3,7 @@ import { loadCustomWorkflows, workflowOptionIssues } from './custom-workflows.js
 import { modelTypeChoices } from './model-families.js';
 import { familyProfiles } from './family-profiles.js';
 import { inpaintingEnabled } from './features.js';
+import { missingPackPart } from './node-install.js';
 
 export function modelBasename(name = "") {
   return String(name).split(/[\\/]/).pop() || name;
@@ -126,6 +127,12 @@ export function buildProfile({ id, kind, label, displayName, description, model,
   };
 }
 
+/** HEISS Inpaint Stitch: there, or the install that brings it (the HEISS UI Nodes pack). */
+function inpaintStitchState(info) {
+  const setup = missingPackPart(info, "heiss", { detail: "HEISS UI Nodes line up and colour match what edit models hand back before it goes into the picture." });
+  return setup ? { ready: false, setup } : { ready: true };
+}
+
 export function inferModels(info, stats = {}) {
   const missingCoreImageNodes = missingNodes(info, ["KSampler", "CLIPTextEncode", "VAEDecode", "SaveImage"]);
   if (missingCoreImageNodes.length) {
@@ -217,8 +224,9 @@ export function inferModels(info, stats = {}) {
     unsupportedModels,
     modelFiles,
     modelTypeChoices: modelTypeChoices(),
-    // Release switches the studio needs to know about (features.js).
-    features: { inpainting: inpaintingEnabled },
+    // Release switches the studio needs to know about (features.js), and whether
+    // inpainting has HEISS Inpaint Stitch or what installs it.
+    features: { inpainting: inpaintingEnabled, ...(inpaintingEnabled ? { inpaintStitch: inpaintStitchState(info) } : {}) },
     textEncoders: clips,
     vaes,
     clipTypes,
