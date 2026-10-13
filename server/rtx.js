@@ -12,6 +12,8 @@ import { nodePack, nodePacks } from "./node-packs.js";
  * Getting it ready takes two parts, each with the usual install panel:
  *   nodes   - HEISS UI Nodes at a commit with HEISS RTX Video (`heiss`)
  *   package - NVIDIA's nvidia-vfx in ComfyUI's Python (`heissrtx`, ~0.5 GB)
+ * (restart  - an old nvidia-vfx that ComfyUI has loaded on Windows, whose files stay
+ *             locked until ComfyUI restarts: updating it then would leave it half removed)
  * and the pack's own check (GET /heiss/rtx/status) says whether it runs here.
  */
 
@@ -71,6 +73,7 @@ export function rtxStatusFrom({ info = {}, device = null, check = null, nodesRea
   if (!check) return { ...base, stage: "checking", reason: "ComfyUI didn't answer the RTX check." };
   if (!check.nvvfx) return { ...base, stage: "package", reason: "NVIDIA's RTX video package isn't installed in ComfyUI yet." };
   // An install from before 0.2 (no ImageEncoding): the package step again, whose pip -r upgrades it.
+  if (check.nvvfxTooOld && check.nvvfxLocked) return { ...base, stage: "restart", reason: "NVIDIA's RTX video package is too old, and ComfyUI has it loaded, which keeps its files locked on Windows. Restart ComfyUI, then update it here." };
   if (check.nvvfxTooOld) return { ...base, stage: "package", reason: check.reason || "NVIDIA's RTX video package is too old; 0.2 or newer is needed." };
   if (!check.ready) return { ...base, stage: "error", reason: check.reason || "RTX upscaling can't run here." };
   return { ...base, ready: true, stage: "ready" };

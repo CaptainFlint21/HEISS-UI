@@ -8,7 +8,7 @@ import type { AutoUpscale, NodePackInfo, PackAutoInstall, ShellPlan } from './ty
  * and setup ask again. On anything but an NVIDIA card `offered` stays false
  * and nothing anywhere mentions it.
  */
-export type RtxStage = 'unsupported' | 'nodes' | 'checking' | 'package' | 'error' | 'ready';
+export type RtxStage = 'unsupported' | 'nodes' | 'checking' | 'package' | 'restart' | 'error' | 'ready';
 
 export type RtxStatus = {
   offered: boolean;
@@ -81,6 +81,7 @@ export function rtxStageLine(status: RtxStatus | null) {
     case 'ready': return status.frameGeneration ? 'Ready · upscaling and smoothing' : 'Ready · upscaling (smoothing needs an RTX 40-series or newer)';
     case 'nodes': return 'Needs the newest HEISS UI Nodes';
     case 'package': return 'Needs NVIDIA’s RTX video package (about 0.5 GB)';
+    case 'restart': return status.reason || 'Restart ComfyUI, then update NVIDIA’s RTX video package';
     case 'checking': return 'ComfyUI didn’t answer the check';
     case 'error': return status.reason || 'Installed, but didn’t run';
     default: return status.reason;

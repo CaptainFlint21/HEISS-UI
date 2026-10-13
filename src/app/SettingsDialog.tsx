@@ -376,6 +376,10 @@ function RtxVideoSettings({ prefs, setPrefs, showToast }: { prefs: Preferences; 
         <div className="set-node-install">
           <button type="button" className="btn is-primary" onClick={() => openHeissNodes('rtx')}><Download size={14} /> Set up HEISS UI Nodes</button>
         </div>
+      ) : status.stage === 'restart' ? (
+        <div className="set-node-install">
+          <ComfyRestart onBack={() => { loadRtxStatus({ fresh: true }); }} />
+        </div>
       ) : status.setup ? (
         <div className="set-node-install">
           <NodeInstall pack={status.setup.pack} plan={status.setup} managerHint={status.setup.manager} autoInstall={status.setup.autoInstall} showToast={showToast} onRestarted={() => { loadRtxStatus({ fresh: true, probe: true }); }} afterRestart="Then check again here." />

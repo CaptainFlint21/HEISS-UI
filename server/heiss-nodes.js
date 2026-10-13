@@ -27,8 +27,8 @@ export const heissFeatures = [
     label: "RTX video upscale",
     blurb: "Videos upscaled in seconds, and smoother if you like.",
     nodes: ["HeissRTXVideo", "HeissRTXUpscale"],
-    // 6: an nvidia-vfx older than 0.2 is reported too old instead of failing every run.
-    version: 6,
+    // 6: an nvidia-vfx older than 0.2 is reported too old instead of failing every run; 7: and locked, on Windows.
+    version: 7,
     // Only offered on an NVIDIA card; its second part is NVIDIA's own package (rtx.js).
     nvidia: true
   },
@@ -38,8 +38,8 @@ export const heissFeatures = [
     blurb: "What edit models repaint, lined up and colour matched, so no seam shows.",
     // Inpainting works without it (ComfyUI's plain composite); with it, the stitch corrects (inpaint.js).
     nodes: ["HeissInpaintStitch"],
-    // 5: colour match leaves a meant change alone, and the correction is read bicubic.
-    version: 5
+    // 5: colour match leaves a meant change alone, and the correction is read bicubic; 7: none under half a pixel.
+    version: 7
   }
 ];
 

@@ -29,7 +29,8 @@ version opens with a `> ` summary line, which the update pill shows.
   at the same length. The original is always kept. Set it up in Settings ›
   Features › Smart upscale: the HEISS UI Nodes, then NVIDIA's package (about
   0.5 GB). An older NVIDIA package (0.1) is caught and updated through the
-  same step. Not shown on Macs or AMD cards, and not for Hidden videos yet.
+  same step; on Windows, if ComfyUI already has it loaded, HEISS asks for a
+  ComfyUI restart first so the update can replace its files. Not shown on Macs or AMD cards, and not for Hidden videos yet.
 - **HEISS UI Nodes install themselves the first time you need them.** Touch
   Rapid or RTX video upscale on a ComfyUI without HEISS's own nodes and one
   dialog installs them all, waits for ComfyUI to restart, and carries on with
@@ -45,7 +46,8 @@ version opens with a `> ` summary line, which the update pill shows.
   on the ring around the paint before it goes into the picture. A correction
   is only made when it is plausible and actually helps, a big colour change
   you asked for is left alone, and everything outside the paint stays the
-  original's exact pixels. The picture's details say what it corrected.
+  original's exact pixels, and a drift under half a pixel is left alone
+  rather than resampled. The picture's details say what it corrected.
   Checked on Klein 9B, Qwen-Image 2.1, Z-Image and Pony across 72 runs.
   Idea after Inpaint Canvas by DenRakEiw.
 - **HEISS UI Nodes install and update on any drive.** On a drive that

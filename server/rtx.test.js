@@ -33,6 +33,10 @@ test("it is offered on NVIDIA cards only, and says which part is missing", () =>
   const old = rtxStatusFrom({ device: nvidia, info: rtxNodes, check: check({ nvvfx: "0.1.0.1", nvvfxTooOld: true, ready: false, reason: "NVIDIA's RTX video package is too old (0.1.0.1); 0.2 or newer is needed." }) });
   assert.deepEqual([old.stage, old.packageInstalled], ["package", false]);
   assert.match(old.reason, /0\.1\.0\.1/);
+  // Loaded on Windows (pack 7 on): restart ComfyUI before pip touches its files.
+  const locked = rtxStatusFrom({ device: nvidia, info: rtxNodes, check: check({ nvvfx: "0.1.0.1", nvvfxTooOld: true, nvvfxLocked: true, ready: false }) });
+  assert.deepEqual([locked.stage, locked.packageInstalled], ["restart", false]);
+  assert.match(locked.reason, /Restart ComfyUI/);
   const broken = rtxStatusFrom({ device: nvidia, info: rtxNodes, check: check({ ready: false, reason: "NvVFX_Load failed" }) });
   assert.deepEqual([broken.stage, broken.ready, broken.reason], ["error", false, "NvVFX_Load failed"]);
   const ready = rtxStatusFrom({ device: nvidia, info: rtxNodes, check: check() });
