@@ -1,0 +1,113 @@
+{
+  "size": 1024,
+  "cases": [
+    {
+      "id": "collar-necklace",
+      "image": "portrait-collar-1600.png",
+      "mask": {
+        "cx": 0.498,
+        "cy": 0.69,
+        "rx": 0.15,
+        "ry": 0.095
+      },
+      "prompt": "replace the gold necklaces with one thick silver chain necklace",
+      "lines": "two thin necklaces and both lapels of the blazer cross the paint"
+    },
+    {
+      "id": "flag-border",
+      "image": "portrait-collar-1600.png",
+      "mask": {
+        "cx": 0.08,
+        "cy": 0.6,
+        "rx": 0.14,
+        "ry": 0.13
+      },
+      "prompt": "replace the flag with a dark green velvet curtain",
+      "lines": "flag stripes and stars, the blazer's shoulder; the paint touches the left border"
+    },
+    {
+      "id": "sign-text",
+      "image": "sign-text-1600.png",
+      "mask": {
+        "cx": 0.575,
+        "cy": 0.552,
+        "rx": 0.075,
+        "ry": 0.045
+      },
+      "prompt": "make the sign say GRAND TAHOE instead of GRAND TETON",
+      "lines": "carved letters, the wood grain"
+    },
+    {
+      "id": "beach-horizon",
+      "image": "beach-horizon-1600.png",
+      "mask": {
+        "cx": 0.3,
+        "cy": 0.13,
+        "rx": 0.15,
+        "ry": 0.09
+      },
+      "prompt": "a large white sailing ship on the sea",
+      "lines": "the horizon and the surf line cross the paint"
+    },
+    {
+      "id": "astronaut-patches",
+      "image": "portrait-astronaut-1600.png",
+      "mask": {
+        "cx": 0.508,
+        "cy": 0.293,
+        "rx": 0.09,
+        "ry": 0.045
+      },
+      "prompt": "replace the patches with a single gold star badge",
+      "lines": "the zipper, collar and patch edges"
+    },
+    {
+      "id": "edge-large-mask",
+      "image": "portrait-collar-1600.png",
+      "mask": {
+        "cx": 0.5,
+        "cy": 0.5,
+        "rx": 0.48,
+        "ry": 0.48
+      },
+      "prompt": "make her blazer bright red leather",
+      "lines": "covers most of the picture, so HEISS works on the whole image"
+    },
+    {
+      "id": "edge-tiny-mask",
+      "image": "portrait-collar-1600.png",
+      "mask": {
+        "cx": 0.63,
+        "cy": 0.42,
+        "rx": 0.012,
+        "ry": 0.01
+      },
+      "prompt": "a small pearl earring",
+      "lines": "a mask a few dozen pixels across, on the earring"
+    },
+    {
+      "id": "edge-corner",
+      "image": "sign-text-1600.png",
+      "mask": {
+        "cx": 0.97,
+        "cy": 0.04,
+        "rx": 0.08,
+        "ry": 0.08
+      },
+      "prompt": "a small white cloud in the blue sky",
+      "lines": "touches the top and right borders"
+    },
+    {
+      "id": "edge-night",
+      "image": "sign-text-1600.png",
+      "mask": {
+        "cx": 0.575,
+        "cy": 0.552,
+        "rx": 0.075,
+        "ry": 0.045
+      },
+      "prompt": "make it night",
+      "lines": "a global request on a partial mask"
+    }
+  ]
+}
