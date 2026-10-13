@@ -65,11 +65,13 @@ export function rtxStatusFrom({ info = {}, device = null, check = null, nodesRea
   // The pack's version decides when it's known (heiss-nodes.js); node names alone otherwise.
   const nodesInstalled = typeof nodesReady === "boolean" ? nodesReady : !nodes.length;
   const offered = kind === "nvidia" || Boolean(check?.device);
-  const base = { offered, nodesInstalled, missingNodes: nodes, packageInstalled: Boolean(check?.nvvfx), ready: false, frameGeneration: Boolean(check?.frameGeneration), device: check?.device || null, torch: check?.torch || "", cuda: check?.cuda || "", reason: "" };
+  const base = { offered, nodesInstalled, missingNodes: nodes, packageInstalled: Boolean(check?.nvvfx) && !check?.nvvfxTooOld, ready: false, frameGeneration: Boolean(check?.frameGeneration), device: check?.device || null, torch: check?.torch || "", cuda: check?.cuda || "", reason: "" };
   if (!offered) return { ...base, stage: "unsupported", reason: kind === "apple" ? "RTX upscaling needs an NVIDIA RTX card; Macs don't have one." : "RTX upscaling needs an NVIDIA RTX card." };
   if (!nodesInstalled) return { ...base, stage: "nodes", reason: "ComfyUI needs the newest HEISS UI Nodes for RTX upscaling." };
   if (!check) return { ...base, stage: "checking", reason: "ComfyUI didn't answer the RTX check." };
   if (!check.nvvfx) return { ...base, stage: "package", reason: "NVIDIA's RTX video package isn't installed in ComfyUI yet." };
+  // An install from before 0.2 (no ImageEncoding): the package step again, whose pip -r upgrades it.
+  if (check.nvvfxTooOld) return { ...base, stage: "package", reason: check.reason || "NVIDIA's RTX video package is too old; 0.2 or newer is needed." };
   if (!check.ready) return { ...base, stage: "error", reason: check.reason || "RTX upscaling can't run here." };
   return { ...base, ready: true, stage: "ready" };
 }

@@ -28,7 +28,8 @@ version opens with a `> ` summary line, which the update pill shows.
   On an RTX 40-series or newer, "Smoother video" also doubles the frame rate
   at the same length. The original is always kept. Set it up in Settings ›
   Features › Smart upscale: the HEISS UI Nodes, then NVIDIA's package (about
-  0.5 GB). Not shown on Macs or AMD cards, and not for Hidden videos yet.
+  0.5 GB). An older NVIDIA package (0.1) is caught and updated through the
+  same step. Not shown on Macs or AMD cards, and not for Hidden videos yet.
 - **HEISS UI Nodes install themselves the first time you need them.** Touch
   Rapid or RTX video upscale on a ComfyUI without HEISS's own nodes and one
   dialog installs them all, waits for ComfyUI to restart, and carries on with

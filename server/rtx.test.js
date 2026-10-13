@@ -29,6 +29,10 @@ test("it is offered on NVIDIA cards only, and says which part is missing", () =>
   assert.equal(rtxStatusFrom({ device: nvidia, info: {} }).stage, "nodes");
   assert.equal(rtxStatusFrom({ device: nvidia, info: rtxNodes, check: null }).stage, "checking");
   assert.equal(rtxStatusFrom({ device: nvidia, info: rtxNodes, check: check({ nvvfx: null, ready: false }) }).stage, "package");
+  // nvidia-vfx 0.1 (pack 6 on): the package step again, to upgrade it.
+  const old = rtxStatusFrom({ device: nvidia, info: rtxNodes, check: check({ nvvfx: "0.1.0.1", nvvfxTooOld: true, ready: false, reason: "NVIDIA's RTX video package is too old (0.1.0.1); 0.2 or newer is needed." }) });
+  assert.deepEqual([old.stage, old.packageInstalled], ["package", false]);
+  assert.match(old.reason, /0\.1\.0\.1/);
   const broken = rtxStatusFrom({ device: nvidia, info: rtxNodes, check: check({ ready: false, reason: "NvVFX_Load failed" }) });
   assert.deepEqual([broken.stage, broken.ready, broken.reason], ["error", false, "NvVFX_Load failed"]);
   const ready = rtxStatusFrom({ device: nvidia, info: rtxNodes, check: check() });

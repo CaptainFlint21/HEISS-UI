@@ -27,7 +27,8 @@ export const heissFeatures = [
     label: "RTX video upscale",
     blurb: "Videos upscaled in seconds, and smoother if you like.",
     nodes: ["HeissRTXVideo", "HeissRTXUpscale"],
-    version: 3,
+    // 6: an nvidia-vfx older than 0.2 is reported too old instead of failing every run.
+    version: 6,
     // Only offered on an NVIDIA card; its second part is NVIDIA's own package (rtx.js).
     nvidia: true
   },
