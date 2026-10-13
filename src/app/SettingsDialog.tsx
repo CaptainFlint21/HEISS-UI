@@ -29,6 +29,8 @@ import { OtherDevicesGroup } from './OtherDevices';
 import { TrashRow } from './TrashRow';
 import { loadRtxStatus, rtxStageLine, useRtxStatus } from './rtx';
 import { featureReady, loadHeissNodes, openHeissNodes, useHeissNodes } from './heissNodes';
+import { loadEnhanceStatus, openEnhanceSetup, saveEnhanceSettings, useEnhance } from './promptEnhance';
+import { enhanceShortcut } from './EnhanceComposer';
 import type { ShowToast } from './toast';
 
 export const SETTINGS_SECTIONS = [
@@ -140,6 +142,68 @@ export function Row({ label, description, children, stacked, disabled }: React.P
       </div>
       {children ? <div className="set-row-control">{children}</div> : null}
     </div>
+  );
+}
+
+const creativityLevels = [{ value: 'faithful', label: 'Faithful', amount: 0.4 }, { value: 'balanced', label: 'Balanced', amount: 0.7 }, { value: 'bold', label: 'Bold', amount: 1 }] as const;
+
+/**
+ * Prompt enhance (promptEnhance.ts): on or off, set up or not, which local
+ * model writes, how freely, and standing instructions for every prompt.
+ */
+function EnhanceSettingsDrawer({ prefs, setPrefs }: { prefs: Preferences; setPrefs: (next: Partial<Preferences>) => void }) {
+  const { status } = useEnhance();
+  const admin = useThisComputer();
+  const on = prefs.promptEnhance !== false;
+  const [instructions, setInstructions] = React.useState<string | null>(null);
+  React.useEffect(() => { loadEnhanceStatus(); }, []);
+  const settings = status?.settings;
+  const listed = (status?.choices || []).filter((choice) => choice.listed);
+  const level = creativityLevels.reduce((best, item) => Math.abs(item.amount - (settings?.creativity ?? 0.7)) < Math.abs(best.amount - (settings?.creativity ?? 0.7)) ? item : best, creativityLevels[1]);
+  const save = (patch: Parameters<typeof saveEnhanceSettings>[0]) => { saveEnhanceSettings(patch).catch(() => null); };
+  const model = listed.find((choice) => choice.file === status?.model);
+  return (
+    <SettingsDrawer id="set-feature-enhance" title="Prompt enhance" description={!on ? 'Off' : status?.ready ? `On · ${model?.label || 'ready'}` : 'On · needs setting up'}>
+      <SwitchRow
+        label="Prompt enhance"
+        description={`The spark in the prompt bar (${enhanceShortcut}): a few words become the prompt your model wants, a picture becomes a prompt, a start frame gets its motion. A local vision model writes it inside ComfyUI, uncensored, and nothing leaves this computer.`}
+        checked={on}
+        onChange={(next) => setPrefs({ promptEnhance: next })}
+      />
+      {on && status && !status.ready ? (
+        <Row label="Setup" description={status.nodes.ready ? 'Choose and download the model that writes.' : 'It runs on HEISS UI Nodes 8 and a local model.'}>
+          <button type="button" className="btn" onClick={openEnhanceSetup}><Wand2 size={13} /> Set up</button>
+        </Row>
+      ) : null}
+      {on && status?.ready ? (
+        <>
+          <Row label="Model" description={model?.note || 'The model that writes.'}>
+            {listed.length > 1 && admin
+              ? <Segmented label="Model" value={status.model} onChange={(next) => save({ model: next })} options={listed.map((choice) => ({ value: choice.file, label: choice.label }))} />
+              : <span className="set-value">{model?.label || status.model}</span>}
+          </Row>
+          {admin && listed.length < (status.choices || []).length ? (
+            <Row label="Other models" description="Another writer to switch to: faster, or richer.">
+              <button type="button" className="btn" onClick={openEnhanceSetup}>Get one</button>
+            </Row>
+          ) : null}
+          <Row label="Style" description={level.value === 'faithful' ? 'Sticks closely to your words; adds only what fills the picture in.' : level.value === 'bold' ? 'Takes more creative liberties with light, framing and detail.' : 'Rich detail that stays true to what you asked for.'}>
+            <Segmented label="Style" value={level.value} onChange={(next) => save({ creativity: creativityLevels.find((item) => item.value === next)?.amount ?? 0.7 })} options={creativityLevels.map(({ value, label }) => ({ value, label }))} />
+          </Row>
+          <Row label="Your instructions" description="Followed in every prompt it writes, over its own rules: a look you always want, words to avoid, a language for text in pictures." stacked>
+            <textarea
+              className="enhance-instructions"
+              value={instructions ?? settings?.instructions ?? ''}
+              placeholder="Always photographic, natural light. British spelling."
+              maxLength={2000}
+              disabled={!admin}
+              onChange={(event) => setInstructions(event.target.value)}
+              onBlur={() => { if (instructions !== null && instructions !== settings?.instructions) save({ instructions }); setInstructions(null); }}
+            />
+          </Row>
+        </>
+      ) : null}
+    </SettingsDrawer>
   );
 }
 
@@ -1040,6 +1104,10 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
                 </>
               ) : null}
             </SettingsDrawer>
+          </Group>
+
+          <Group>
+            <EnhanceSettingsDrawer prefs={prefs} setPrefs={setPrefs} />
           </Group>
 
           <Group>

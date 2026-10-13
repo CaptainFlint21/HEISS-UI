@@ -40,6 +40,14 @@ export const heissFeatures = [
     nodes: ["HeissInpaintStitch"],
     // 5: colour match leaves a meant change alone, and the correction is read bicubic; 7: none under half a pixel.
     version: 7
+  },
+  {
+    id: "enhance",
+    label: "Prompt enhance",
+    blurb: "A few words become the prompt your model wants, written on this computer.",
+    // The node streams the text as it's written; 8 also lists a just-downloaded model without a restart.
+    nodes: ["HeissPromptEnhance"],
+    version: 8
   }
 ];
 

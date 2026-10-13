@@ -7,6 +7,8 @@ import { cn } from './format';
 import { AspectPicker, ModelPicker, NumberPicker, Skeleton, Tip, type ControlDensity, type ModelMenuState } from './components';
 import { AnimatedNumber } from './AnimatedNumber';
 import { ReferenceSlots } from './ReferenceMediaPicker';
+import { EnhanceButton } from './EnhanceComposer';
+import type { EnhancePhase } from './usePromptEnhance';
 import type { AspectPreset, AutoUpscale, MediaInput, Profile, SavedSize, ReferenceAsset, ReferenceInpaint, ReferenceRoleControl, SelectedReferenceAsset } from './types';
 import { estimatePhrase, formatAbout, type GenerationEstimate } from './useGenerationEstimate';
 import type { SizeTier } from './SizeMenu';
@@ -284,6 +286,10 @@ export type ComposerBarProps = {
   /** Recent prompts: the clock beside Negative, shown once there is a history. */
   onToggleHistory?: () => void;
   historyOpen?: boolean;
+  /** Prompt enhance (usePromptEnhance.ts): where it stands, what pressing does, and the press. */
+  enhancePhase?: EnhancePhase;
+  enhanceVerb?: string;
+  onEnhance?: () => void;
 };
 
 export function ComposerBar(props: ComposerBarProps) {
@@ -296,7 +302,8 @@ export function ComposerBar(props: ComposerBarProps) {
     showNegativePrompt, setShowNegativePrompt, canUseNegativePrompt,
     runningCount, generateDisabled, generateDisabledReason, generate, refreshComfyStatus, comfyRetrying,
     referenceInputs = [], referenceInpaint = null, referenceRole = null, loraMismatch = null, onDismissLoraMismatch, setupTip = null, onHideSetupTip, onNeverSetupTip, referenceAssets = [], onReferenceSelect, onReferenceRemove, onReferenceDeleteRequest, onReferenceError,
-    pinnedSeed = "", onRandomSeed, generationEstimate = null, generateKey = "", onToggleHistory, historyOpen = false
+    pinnedSeed = "", onRandomSeed, generationEstimate = null, generateKey = "", onToggleHistory, historyOpen = false,
+    enhancePhase, enhanceVerb, onEnhance
   } = props;
 
   const showVariants = mode === "image" && currentProfile?.capabilities.variations !== false;
@@ -435,6 +442,7 @@ export function ComposerBar(props: ComposerBarProps) {
               </button>
             </Tip>
           ) : null}
+          {onEnhance && enhancePhase ? <EnhanceButton phase={enhancePhase} verb={enhanceVerb || "Enhance prompt"} onClick={onEnhance} /> : null}
           {inline("private", privateToggle)}
           {pinnedSeed.trim() && onRandomSeed ? (
             <Tip content={`Every run uses seed ${pinnedSeed.trim()}. Click for a random seed.`}>

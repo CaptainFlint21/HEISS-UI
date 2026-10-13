@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { hasNode, missingNodes, modelFolders, nodeRange, optionsFor } from './comfy.js';
-import { MAX_BATCH, checkpointDownloads, encoderDownloads, families, knownFamilies, modelDownloads, quantFormats, sanaConf, sanaLabel, sanaLatentNode, sanaPresets, guidanceFor, rapidFor, sanaRunnerFor, vaeDownloads, variantDefaults, visionDownloads, visionKinds } from './family-catalog.js';
+import { MAX_BATCH, checkpointDownloads, encoderDownloads, enhancerDownloads, families, knownFamilies, modelDownloads, quantFormats, sanaConf, sanaLabel, sanaLatentNode, sanaPresets, guidanceFor, rapidFor, sanaRunnerFor, vaeDownloads, variantDefaults, visionDownloads, visionKinds } from './family-catalog.js';
 import { existingCopy } from './model-downloads.js';
 import { inpaintingEnabled } from './features.js';
 import { inpaintNodes } from './inpaint.js';
@@ -59,7 +59,8 @@ const downloadSources = {
   vae: [vaeDownloads, "vae"],
   model: [modelDownloads, "diffusion_models"],
   checkpoint: [checkpointDownloads, "checkpoints"],
-  vision: [visionDownloads, "clip_vision"]
+  vision: [visionDownloads, "clip_vision"],
+  enhancer: [enhancerDownloads, "text_encoders"]
 };
 
 /** Every catalog download HEISS will fetch, by id. The only files the download route accepts. */
