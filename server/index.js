@@ -61,7 +61,7 @@ import { applyLoraOps, clearLoraState, loadLoraLibrary, loadLoraStack, saveLoraL
 import { inpaintInputNames, prepareInpaint } from './inpaint.js';
 import { bytesForReference, deleteUploadedReference, listReferenceAssets, readMultipartImage, readUploadedReference, referenceAssetFromGallery, saveUploadedReference, stageReferenceAssets, uploadBufferToComfy } from './reference-assets.js';
 import { prepareInputImage } from './input-image-sizing.js';
-import { enhanceModel, enhanceTarget, enhancerChoices, finishPrompt, loadEnhanceSettings, refusalMessage, runEnhance, saveEnhanceSettings, sexualMinorContent, systemPrompt, tokenBudget, userTurn } from './prompt-enhance.js';
+import { enhanceModel, enhanceTarget, enhancerChoices, finishPrompt, loadEnhanceSettings, runEnhance, saveEnhanceSettings, systemPrompt, tokenBudget, userTurn } from './prompt-enhance.js';
 import { nodePack, nodePacks } from './node-packs.js';
 import { beginComfyRestart, comfyRestartStartedAt, comfyRestarting, finishComfyRestart, lastComfyRestart, noteComfyRestart } from './comfy-restart.js';
 import { failedPacks, loadedPacks, logTextFromRaw, packLabel, restartChanges } from './restart-insights.js';
@@ -86,6 +86,7 @@ import { autoDetectOutputDir, detectOutputDirs, inspectOutputDir, outputDirChoic
 import { compressJson, serveApp } from './http-assets.js';
 import { describeGitError, updateCheckout } from './git-update.js';
 import { diagnostics, diagnosticsText } from './diagnostics.js';
+
 
 // Thumbnails building and waiting, in every heartbeat and crash line.
 addProbe("thumbs", () => buildStats());
@@ -1974,10 +1975,6 @@ app.post("/api/enhance", async (req, res) => {
   const family = String(body.family || "").slice(0, 64);
   const variant = String(body.variant || "").slice(0, 64);
   const text = String(body.prompt || "").slice(0, 4000);
-  if (sexualMinorContent(text)) {
-    res.status(400).json({ ok: false, reason: "refused", error: refusalMessage });
-    return;
-  }
   const target = enhanceTarget({ kind, family, variant, hasImage: Boolean(assetId), hasText: Boolean(text.trim()), editing: Boolean(body.editing) });
   let staged = null;
   if (assetId) {
@@ -1998,7 +1995,6 @@ app.post("/api/enhance", async (req, res) => {
   const { settings } = status;
   // "Again" asks for another take: a little more freedom than the first.
   const temperature = Math.min(1.2, settings.creativity + (body.again ? 0.15 : 0));
-  let refused = false;
   try {
     await runEnhance({
       model: status.model,
@@ -2010,21 +2006,10 @@ app.post("/api/enhance", async (req, res) => {
       seed: crypto.randomInt(0, 2 ** 31)
     }, {
       signal: stop.signal,
-      emit: (event) => {
-        if (refused) return;
-        if (event.text === undefined) { send(event); return; }
-        // Watched as it is written: the moment it turns into sexual content about a minor, the run ends with nothing kept.
-        if (sexualMinorContent(event.text)) {
-          refused = true;
-          send({ type: "error", error: refusalMessage });
-          stop.abort();
-          return;
-        }
-        send({ ...event, text: finishPrompt(target, event.text, family) });
-      }
+      emit: (event) => send(event.text === undefined ? event : { ...event, text: finishPrompt(target, event.text, family) })
     });
   } catch (error) {
-    if (!error.stopped && !refused) send({ type: "error", error: error.message || "Prompt enhance failed." });
+    if (!error.stopped) send({ type: "error", error: error.message || "Prompt enhance failed." });
   } finally {
     if (staged?.temporary) await forgetComfyRun({ inputNames: [staged.comfyName] });
     res.end();

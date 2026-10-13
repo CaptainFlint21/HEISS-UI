@@ -7,7 +7,7 @@ import test from "node:test";
 process.env.HEISS_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-enhance-"));
 const {
   enhanceGraph, enhanceModel, enhanceResult, enhanceTarget, enhancerChoices, finishPrompt, friendlyFailure,
-  loadEnhanceSettings, promptLength, saveEnhanceSettings, sexualMinorContent, systemPrompt, tokenBudget, userTurn
+  loadEnhanceSettings, promptLength, saveEnhanceSettings, systemPrompt, tokenBudget, userTurn
 } = await import("./prompt-enhance.js");
 
 test("what it writes follows what the composer holds", () => {
@@ -33,10 +33,9 @@ test("length fits the model: short for CLIP, long for the big LLM encoders, tags
   assert.ok(tokenBudget("image", "flux1") < 300);
 });
 
-test("the system prompt: uncensored for adults, never minors, the task, and the person's own instructions last", () => {
+test("the system prompt: the base rules, the task, and the person's own instructions last", () => {
   const prompt = systemPrompt("image", { family: "flux1", instructions: "British spelling." });
   assert.match(prompt, /uncensored/);
-  assert.match(prompt, /nothing sexual, nude or erotic ever involves anyone under 18/);
   assert.match(prompt, /70 to 130 words/);
   assert.ok(prompt.trimEnd().endsWith("British spelling."));
   assert.match(systemPrompt("tags", { family: "sdxl", variant: "pony" }), /score_9, score_8_up, score_7_up/);
@@ -59,15 +58,6 @@ test("tags: one of each, no negative tags, about the asked-for count", () => {
   const many = Array.from({ length: 80 }, (_, index) => `tag${index}`).join(", ");
   assert.equal(finishPrompt("tags", many, "sdxl").split(", ").length, 50);
   assert.equal(finishPrompt("image", "  A fox. "), "A fox.");
-});
-
-test("sexual content about minors is caught; adults, and children in anything else, are not", () => {
-  for (const text of ["A nude teenage girl sits on a bed", "loli, nude, 1girl", "15 years old, naked", "schoolgirl in lingerie", "young girl, erotic pose"]) {
-    assert.equal(sexualMinorContent(text), true, text);
-  }
-  for (const text of ["A nude woman reclines on a sofa", "2girls, nude, adult", "a teen skateboarding in a park", "A child flies a kite at the beach", "kidding aside, a sexy car"]) {
-    assert.equal(sexualMinorContent(text), false, text);
-  }
 });
 
 test("the graph: the model, the node with its stream id, and the picture when there is one", () => {

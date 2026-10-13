@@ -2,7 +2,7 @@
 
 The spark in the prompt bar (Ctrl+E, ⌘E on a Mac). A local vision model turns a few words into the prompt the selected model wants, reads an attached picture into one, or writes the motion for an image-to-video start frame. The new prompt is written into the box word by word; Undo puts your words back, and Try again writes another take from them.
 
-It runs inside ComfyUI, so nothing leaves the computer, and ComfyUI's memory management swaps it in and out with the picture and video models. It is uncensored for adults. The one hard limit is sexual content involving minors, which it refuses, whatever the model would write.
+It runs inside ComfyUI, so nothing leaves the computer, and ComfyUI's memory management swaps it in and out with the picture and video models. It is uncensored.
 
 ## What it writes
 
@@ -35,7 +35,7 @@ The model has to fit in VRAM whole. If it doesn't, ComfyUI's dynamic VRAM stream
 
 ## How it runs
 
-1. `POST /api/enhance` checks setup and the guard, uploads a picture at about 0.4 MP (enough for a 4B model, a fraction of the vision tokens), and answers with server-sent events.
+1. `POST /api/enhance` checks setup, uploads a picture at about 0.4 MP (enough for a 4B model, a fraction of the vision tokens), and answers with server-sent events.
 2. It queues a three-node graph at the front of ComfyUI's queue: `CLIPLoader` → `HeissPromptEnhance` (+ `LoadImage`). A render already running finishes first; the island says "Waiting for the current render".
 3. HEISS Prompt Enhance (HEISS UI Nodes 8) runs ComfyUI's own `generate()` and sends the text so far on ComfyUI's websocket as `heiss.enhance`, about 20 times a second. HEISS relays it, and the composer writes it into the box.
 4. The run's history entry is deleted afterwards. A Hidden picture's upload is removed too.
@@ -51,6 +51,6 @@ Pressing the spark before it is set up opens the setup dialog: HEISS UI Nodes 8 
 
 ComfyUI only rescans a model folder when the folder's modified time changes, and exFAT never changes it, so a model downloaded there stayed invisible until a restart. Pack 8 adds `POST /heiss/models/rescan`, which drops ComfyUI's cached lists. `/api/enhance/status` calls it when a catalog model is on disk but not listed.
 
-## The guard
+## Content checks
 
-`sexualMinorContent()` looks for a minor term (teen, child, schoolgirl, an age under 18, …) together with a sexual one. It is checked against the idea before a run, and against the text while it is written. A match ends the run, so no text reaches the composer. The system prompt also says that everyone in sexual or nude content is an adult and is described as one. But a small abliterated model can still call someone "teenage" when reading a picture, which is why the check runs on the output too.
+None yet. The system prompt is the base prompt alone; a content check (an API-based one, run on the idea and on the text as it is written) is to be built on it before release.

@@ -21,9 +21,9 @@ version opens with a `> ` summary line, which the update pill shows.
   frame, the motion. Undo and Try again sit above the prompt afterwards. It
   runs in ComfyUI on HEISS UI Nodes 8 with an uncensored Qwen3-VL 4B (or
   Qwen3.5), so nothing leaves the computer: on an 8 GB card the first words
-  come in about a second and a half. The first press sets it up in one dialog. It
-  never writes sexual content involving minors. Settings › Features sets the
-  model, the style and standing instructions.
+  come in about a second and a half. The first press sets it up in one
+  dialog. Settings › Features sets the model, the style and standing
+  instructions.
 - **Rapid: pictures in about half the time, same VRAM.** On Krea 2, Z-Image,
   Flux, Flux.2 Klein, Qwen-Image, Chroma and SDXL (Pony, Illustrious), the
   noisy first steps of a picture run at half size and the rest at full size,
