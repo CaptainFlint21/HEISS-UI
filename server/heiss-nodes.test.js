@@ -91,7 +91,9 @@ test("an older copy without git is set aside (never deleted) and the reviewed on
   fs.writeFileSync(python, "#!/bin/sh\necho pip \"$@\"\n", { mode: 0o755 });
   const bin = path.join(scratch, "bin");
   fs.mkdirSync(bin, { recursive: true });
+  // HEISS passes "-c safe.directory=<folder>" first (gitArgsIn); the subcommand comes after.
   fs.writeFileSync(path.join(bin, "git"), `#!/bin/sh
+while [ "$1" = "-c" ]; do shift 2; done
 case "$1" in
   clone) mkdir -p "$4/.git"; echo "${nodePacks.heiss.commit}" > "$4/.git/HEAD"; printf 'PACK_VERSION = 3\\n' > "$4/heiss_info.py" ;;
   rev-parse) echo "${nodePacks.heiss.commit}" ;;

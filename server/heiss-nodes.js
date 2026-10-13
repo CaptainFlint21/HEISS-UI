@@ -37,7 +37,8 @@ export const heissFeatures = [
     blurb: "What edit models repaint, lined up and colour matched, so no seam shows.",
     // Inpainting works without it (ComfyUI's plain composite); with it, the stitch corrects (inpaint.js).
     nodes: ["HeissInpaintStitch"],
-    version: 4
+    // 5: colour match leaves a meant change alone, and the correction is read bicubic.
+    version: 5
   }
 ];
 

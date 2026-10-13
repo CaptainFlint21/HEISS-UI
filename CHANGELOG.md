@@ -45,7 +45,13 @@ version opens with a `> ` summary line, which the update pill shows.
   is only made when it is plausible and actually helps, a big colour change
   you asked for is left alone, and everything outside the paint stays the
   original's exact pixels. The picture's details say what it corrected.
+  Checked on Klein 9B, Qwen-Image 2.1, Z-Image and Pony across 72 runs.
   Idea after Inpaint Canvas by DenRakEiw.
+- **HEISS UI Nodes install and update on any drive.** On a drive that
+  records no file owner (exFAT, network shares, some Windows data drives)
+  the install stopped with "git stopped with exit code 128"; the one-click
+  install and the terminal steps now work there too, without changing git's
+  settings.
 - **Import a workflow from what you ran in ComfyUI.** Workflows › Import opens
   on your recent ComfyUI runs (with their pictures) and the workflows saved in
   ComfyUI. A workflow file, or an image or video ComfyUI made, works too. No

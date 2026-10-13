@@ -14,7 +14,7 @@ The masks are in `cases.json` (an ellipse in 0–1 image coordinates). `run.mjs`
 
 ## Running it
 
-Start HEISS UI against a ComfyUI with HEISS UI Nodes 4 or newer, then for each model:
+Start HEISS UI against a ComfyUI with HEISS UI Nodes 5 or newer, then for each model:
 
 ```
 node evals/inpaint/run.mjs --profile "<profile id from /api/workflows>" --seeds 101,102,103 --out artifacts/inpaint-verify/matrix
