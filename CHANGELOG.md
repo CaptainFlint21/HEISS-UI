@@ -12,6 +12,18 @@ version opens with a `> ` summary line, which the update pill shows.
 ## [Unreleased]
 
 ### Added
+- **Prompt enhance: a few words become the prompt your model wants.** Press
+  the spark in the prompt bar (or Ctrl+E) and a local vision model writes the
+  prompt into the box word by word, in the form the selected model wants:
+  natural language, tags for Pony and Illustrious, an edit instruction for
+  edit models, a single moving shot for video, with sound for LTX-2. With a
+  picture and no words, it writes the prompt for that picture; with a start
+  frame, the motion. Undo and Try again sit above the prompt afterwards. It
+  runs in ComfyUI on HEISS UI Nodes 8 with an uncensored Qwen3-VL 4B (or
+  Qwen3.5), so nothing leaves the computer: on an 8 GB card the first words
+  come in about a second and a half. The first press sets it up in one dialog. It
+  never writes sexual content involving minors. Settings › Features sets the
+  model, the style and standing instructions.
 - **Rapid: pictures in about half the time, same VRAM.** On Krea 2, Z-Image,
   Flux, Flux.2 Klein, Qwen-Image, Chroma and SDXL (Pony, Illustrious), the
   noisy first steps of a picture run at half size and the rest at full size,

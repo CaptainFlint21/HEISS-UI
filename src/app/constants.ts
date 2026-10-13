@@ -19,6 +19,7 @@ export const defaultPrefs: Preferences = {
   stackRuns: false,
   runStackStyle: "burst",
   smartUpscale: true,
+  promptEnhance: true,
   rapidAll: true,
   rapid: true,
   rapidGuidance: true,

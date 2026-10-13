@@ -29,7 +29,7 @@ import { inferModels, mockModelResult, offlineModelResult } from './models.js';
 import { families } from './family-catalog.js';
 import { primeModelMetadata, setModelChoice } from './model-families.js';
 import { catalogDownload } from './family-profiles.js';
-import { cancelDownload, discardDownload, downloadState, replaceDownload, startDownload } from './model-downloads.js';
+import { cancelDownload, discardDownload, downloadState, existingCopy, replaceDownload, startDownload } from './model-downloads.js';
 import { sanitizeGenerateBody } from './validation.js';
 import { addGalleryItems, dedupeGallery, deleteGalleryFiles, writeGalleryNow, filterVisibleGallery, gallery, galleryKey, galleryLimit, dataDir, hideGalleryItems, makePendingItems, migrateLegacyPrompts, recordsFromComfyHistory, removeGalleryItems, saveGallery, setGallery, cleanupGalleryState, updateGalleryJob, pageGallery, galleryDelta, galleryRevisionValue, sortGallery } from './gallery-store.js';
 import { galleryFilter, setGalleryFavorites } from './gallery-store.js';
@@ -59,7 +59,9 @@ import { adoptHiddenRuns, forgetHiddenRunKeys, settleHiddenRuns, withoutHiddenRu
 import { sendGalleryExport } from './gallery-export.js';
 import { applyLoraOps, clearLoraState, loadLoraLibrary, loadLoraStack, saveLoraLibrary, saveLoraStack } from './lora-stacks.js';
 import { inpaintInputNames, prepareInpaint } from './inpaint.js';
-import { deleteUploadedReference, listReferenceAssets, readMultipartImage, readUploadedReference, referenceAssetFromGallery, saveUploadedReference, stageReferenceAssets } from './reference-assets.js';
+import { bytesForReference, deleteUploadedReference, listReferenceAssets, readMultipartImage, readUploadedReference, referenceAssetFromGallery, saveUploadedReference, stageReferenceAssets, uploadBufferToComfy } from './reference-assets.js';
+import { prepareInputImage } from './input-image-sizing.js';
+import { enhanceModel, enhanceTarget, enhancerChoices, finishPrompt, loadEnhanceSettings, refusalMessage, runEnhance, saveEnhanceSettings, sexualMinorContent, systemPrompt, tokenBudget, userTurn } from './prompt-enhance.js';
 import { nodePack, nodePacks } from './node-packs.js';
 import { beginComfyRestart, comfyRestartStartedAt, comfyRestarting, finishComfyRestart, lastComfyRestart, noteComfyRestart } from './comfy-restart.js';
 import { failedPacks, loadedPacks, logTextFromRaw, packLabel, restartChanges } from './restart-insights.js';
@@ -1903,6 +1905,129 @@ app.get("/api/heiss-nodes", async (req, res) => {
     res.json({ ok: true, ...await heissNodesStatus({ fresh: req.query.fresh === "1" }) });
   } catch {
     res.status(503).json({ ok: false, offline: true, restarting: comfyRestarting(), error: "ComfyUI is offline. Start it, and HEISS checks again." });
+  }
+});
+
+/**
+ * Prompt enhance (prompt-enhance.js, docs/prompt-enhance.md): whether it runs
+ * now, and what setup still needs: HEISS UI Nodes 8, and one of the catalog's
+ * vision LLMs listed by ComfyUI.
+ */
+async function enhanceStatus({ fresh = false } = {}) {
+  const nodes = await heissNodesStatus({ fresh });
+  const nodesReady = Boolean(nodes.features.find((feature) => feature.id === "enhance")?.ready);
+  let { info } = await loadComfyContext();
+  const settings = loadEnhanceSettings();
+  const describe = () => enhancerChoices().map((choice) => ({
+    id: choice.id, file: choice.file, label: choice.label, note: choice.note, bytes: choice.bytes,
+    listed: optionsFor(info, "CLIPLoader", "clip_name").includes(choice.file),
+    onDisk: Boolean(existingCopy({ ...choice, folder: "text_encoders" }))
+  }));
+  let choices = describe();
+  // Downloaded but not listed: ComfyUI keeps its list until a folder's modified time changes, which exFAT never does.
+  if (nodesReady && !enhanceModel(info, settings) && choices.some((choice) => choice.onDisk && !choice.listed)) {
+    await comfy("/heiss/models/rescan", { method: "POST", timeout: 10_000 }).catch(() => null);
+    ({ info } = await loadComfyContext({ force: true }));
+    choices = describe();
+  }
+  const model = enhanceModel(info, settings);
+  return { ready: nodesReady && Boolean(model), nodes: { state: nodes.state, ready: nodesReady }, model, choices, settings };
+}
+
+app.get("/api/enhance/status", async (req, res) => {
+  try {
+    res.json({ ok: true, ...await enhanceStatus({ fresh: req.query.fresh === "1" }) });
+  } catch {
+    res.status(503).json({ ok: false, offline: true, restarting: comfyRestarting(), error: "ComfyUI is offline. Start it, and prompt enhance is back." });
+  }
+});
+
+app.put("/api/enhance/settings", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.json({ ok: true, settings: saveEnhanceSettings(req.body || {}) });
+});
+
+/**
+ * One enhancement, streamed as server-sent events: "start" (what it writes),
+ * "queued" / "loading", "text" as it is written, then "done" or "error".
+ * Closing the request stops the run in ComfyUI.
+ */
+app.post("/api/enhance", async (req, res) => {
+  const body = req.body || {};
+  const assetId = String(body.image?.assetId || "");
+  if (assetId.startsWith("vault:") && !encryptionKeyFromRequest(req)) {
+    res.status(401).json({ ok: false, locked: true, reason: "locked", error: "That picture is in Hidden. Unlock Hidden to use it." });
+    return;
+  }
+  let status;
+  try {
+    status = await enhanceStatus();
+  } catch {
+    res.status(503).json({ ok: false, offline: true, restarting: comfyRestarting(), error: comfyDownMessage() });
+    return;
+  }
+  if (!status.ready) {
+    res.status(409).json({ ok: false, reason: "setup", error: "Prompt enhance needs setting up first." });
+    return;
+  }
+  const kind = body.kind === "video" ? "video" : "image";
+  const family = String(body.family || "").slice(0, 64);
+  const variant = String(body.variant || "").slice(0, 64);
+  const text = String(body.prompt || "").slice(0, 4000);
+  if (sexualMinorContent(text)) {
+    res.status(400).json({ ok: false, reason: "refused", error: refusalMessage });
+    return;
+  }
+  const target = enhanceTarget({ kind, family, variant, hasImage: Boolean(assetId), hasText: Boolean(text.trim()), editing: Boolean(body.editing) });
+  let staged = null;
+  if (assetId) {
+    try {
+      // About 0.4 MP: all the detail a 4B model reads, at a fraction of the vision tokens a full picture costs.
+      const bytes = await prepareInputImage(await bytesForReference(req, assetId), { pixels: 640 * 640 });
+      staged = { ...await uploadBufferToComfy(bytes, { unique: assetId.startsWith("vault:") }), temporary: assetId.startsWith("vault:") };
+    } catch (error) {
+      res.status(400).json({ ok: false, error: error.message });
+      return;
+    }
+  }
+  res.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache, no-transform", connection: "keep-alive", "x-accel-buffering": "no" });
+  const send = (event) => { if (!res.writableEnded) res.write(`data: ${JSON.stringify(event)}\n\n`); };
+  const stop = new AbortController();
+  res.on("close", () => { if (!res.writableFinished) stop.abort(); });
+  send({ type: "start", target });
+  const { settings } = status;
+  // "Again" asks for another take: a little more freedom than the first.
+  const temperature = Math.min(1.2, settings.creativity + (body.again ? 0.15 : 0));
+  let refused = false;
+  try {
+    await runEnhance({
+      model: status.model,
+      system: systemPrompt(target, { family, variant, instructions: settings.instructions }),
+      prompt: userTurn(target, text),
+      image: staged?.comfyName || "",
+      maxTokens: tokenBudget(target, family),
+      temperature,
+      seed: crypto.randomInt(0, 2 ** 31)
+    }, {
+      signal: stop.signal,
+      emit: (event) => {
+        if (refused) return;
+        if (event.text === undefined) { send(event); return; }
+        // Watched as it is written: the moment it turns into sexual content about a minor, the run ends with nothing kept.
+        if (sexualMinorContent(event.text)) {
+          refused = true;
+          send({ type: "error", error: refusalMessage });
+          stop.abort();
+          return;
+        }
+        send({ ...event, text: finishPrompt(target, event.text, family) });
+      }
+    });
+  } catch (error) {
+    if (!error.stopped && !refused) send({ type: "error", error: error.message || "Prompt enhance failed." });
+  } finally {
+    if (staged?.temporary) await forgetComfyRun({ inputNames: [staged.comfyName] });
+    res.end();
   }
 });
 

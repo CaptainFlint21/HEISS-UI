@@ -341,6 +341,8 @@ export type Preferences = {
   /** A folded run: a photo with edges under it, or a cover flow inside one card. */
   runStackStyle: "burst" | "flow";
   smartUpscale: boolean;
+  /** Prompt enhance's button in the composer (Settings › Features). */
+  promptEnhance: boolean;
   /** HEISS Rapid as a whole (the sidebar's switch); its two parts below switch on their own. */
   rapidAll: boolean;
   /** HEISS Rapid: start pictures at half size on the models that support it (docs/rapid.md). */

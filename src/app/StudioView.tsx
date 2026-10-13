@@ -11,6 +11,7 @@ import { AnimatedNumber } from './AnimatedNumber';
 import { GenerationMedia, GenerationPreviewMode } from './GenerationPreview';
 import { GenerationProgress } from './GenerationProgress';
 import { ComposerBar } from './ComposerBar';
+import { EnhanceIsland, EnhanceOverlay } from './EnhanceComposer';
 import { VirtualMasonryGallery } from './VirtualMasonryGallery';
 import { features } from './constants';
 import { RunCard, runKind } from './RunStack';
@@ -131,7 +132,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   };
   const strayModelCount = modelFolders?.strayCount || 0;
   const canUseNegativePrompt = currentProfile?.capabilities?.negativePrompt !== false;
-  const { confirmAction, referenceAssets, referenceInputs, referenceInpaint, referenceRole, retryComfyStatus, comfyRetrying, comfyReconnectedAt } = view;
+  const { confirmAction, referenceAssets, referenceInputs, referenceInpaint, referenceRole, retryComfyStatus, comfyRetrying, comfyReconnectedAt, promptEnhance } = view;
   const gallerySearch = (view.gallerySearch || emptySearch) as GallerySearch;
   const setGallerySearch = view.setGallerySearch as (next: GallerySearch) => void;
   const toggleFavorite = view.toggleFavorite as (items: GalleryItem[], favorite: boolean) => void;
@@ -204,6 +205,16 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     if (event.key === "ArrowUp" && plain && !String(prompt || "").trim() && hasPromptHistory && !event.nativeEvent.isComposing) {
       event.preventDefault();
       setHistoryOpen(true);
+      return;
+    }
+    if (promptEnhance && (event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "e") {
+      event.preventDefault();
+      promptEnhance.run();
+      return;
+    }
+    if (promptEnhance?.busy) {
+      // While it writes, the prompt is the model's: Escape stops it, and nothing else reaches the composer.
+      if (event.key === "Escape") { event.preventDefault(); promptEnhance.stop(); }
       return;
     }
     submitZenPrompt(event);
@@ -654,8 +665,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           <aside id="studio-controls" translate="no" data-open-surface className={cn("zen-controls", zenControls && "open")} inert={!zenControls} aria-label="Generation controls">
             {sidebarControls}
           </aside>
-          <section className="zen-prompt">
-            <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder={referenceInpaint?.mask ? "Describe what the painted part becomes…" : hiddenSpace ? "Describe what to make, privately…" : "Describe what to make…"} onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
+          <section className={cn("zen-prompt", promptEnhance?.busy && "is-enhancing")}>
+            <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder={referenceInpaint?.mask ? "Describe what the painted part becomes…" : hiddenSpace ? "Describe what to make, privately…" : "Describe what to make…"} onKeyDown={promptKeyDown} readOnly={Boolean(promptEnhance?.busy)} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
+            {promptEnhance ? <EnhanceOverlay enhance={promptEnhance} field={zenPromptRef} original={prompt} /> : null}
+            {promptEnhance ? <EnhanceIsland enhance={promptEnhance} /> : null}
             {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
             <div data-open-surface className={cn("negative-drawer", showNegativePrompt && canUseNegativePrompt && "open", !canUseNegativePrompt && "is-unavailable")}>
               <label className="negative-drawer-label">Negative prompt</label>
@@ -743,6 +756,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               generateKey={view.generateKey}
               onToggleHistory={hasPromptHistory ? toggleHistory : undefined}
               historyOpen={historyOpen}
+              enhancePhase={promptEnhance?.phase}
+              enhanceVerb={promptEnhance?.verb}
+              onEnhance={promptEnhance ? promptEnhance.run : undefined}
             />
             {historyPopover}
             {promptIdeas}
@@ -784,8 +800,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           <aside id="studio-controls" translate="no" data-open-surface className={cn("zen-controls", zenControls && "open")} inert={!zenControls} aria-label="Generation controls">
             {sidebarControls}
           </aside>
-          <section className="zen-prompt">
-            <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder={referenceInpaint?.mask ? "Describe what the painted part becomes…" : hiddenSpace ? "Describe what to make, privately…" : "Describe what to make…"} onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
+          <section className={cn("zen-prompt", promptEnhance?.busy && "is-enhancing")}>
+            <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder={referenceInpaint?.mask ? "Describe what the painted part becomes…" : hiddenSpace ? "Describe what to make, privately…" : "Describe what to make…"} onKeyDown={promptKeyDown} readOnly={Boolean(promptEnhance?.busy)} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
+            {promptEnhance ? <EnhanceOverlay enhance={promptEnhance} field={zenPromptRef} original={prompt} /> : null}
+            {promptEnhance ? <EnhanceIsland enhance={promptEnhance} /> : null}
             {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
             <div data-open-surface className={cn("negative-drawer", showNegativePrompt && canUseNegativePrompt && "open", !canUseNegativePrompt && "is-unavailable")}>
               <label className="negative-drawer-label">Negative prompt</label>
@@ -873,6 +891,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               generateKey={view.generateKey}
               onToggleHistory={hasPromptHistory ? toggleHistory : undefined}
               historyOpen={historyOpen}
+              enhancePhase={promptEnhance?.phase}
+              enhanceVerb={promptEnhance?.verb}
+              onEnhance={promptEnhance ? promptEnhance.run : undefined}
             />
             {historyPopover}
             {promptIdeas}

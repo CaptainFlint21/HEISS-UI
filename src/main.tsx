@@ -15,6 +15,7 @@ import { deleteLoraStack, loraFamilyKey, loraFavorites, loraRecents, loraStacks,
 import { useConfirmation } from './app/useConfirmation';
 import { StudioView } from './app/StudioView';
 import { HeissNodesDialog } from './app/HeissNodesDialog';
+import { EnhanceSetupDialog } from './app/EnhanceSetupDialog';
 import { onHeissNodesReady } from './app/heissNodes';
 import { loadRtxStatus } from './app/rtx';
 import { DeviceGate } from './app/DeviceGate';
@@ -23,6 +24,7 @@ import { TooltipProvider } from './components/ui/tooltip';
 import { setShareSettings } from './app/shareSettings';
 import { PhoneAdvancedControls, SidebarControls } from './app/SidebarControls';
 import { useGenerationActions } from './app/useGenerationActions';
+import { usePromptEnhance } from './app/usePromptEnhance';
 import { loraFit, useLoraInfo } from './app/useLoraInfo';
 import type { LoraMismatch } from './app/LoraMismatchChip';
 import { loadWorkflowSettingValues, saveWorkflowSettingValues, type WorkflowSettingValues } from './app/WorkflowSettings';
@@ -1405,6 +1407,8 @@ function App() {
   const promptLimit = settingMax(currentProfile?.constraints?.prompt);
   const negativeLimit = settingMax(currentProfile?.constraints?.negative);
   const promptRemaining = promptLimit ? Math.max(0, promptLimit - textLength(prompt)) : undefined;
+  const focusPrompt = useCallback(() => window.setTimeout(() => zenPromptRef.current?.focus(), 0), []);
+  const promptEnhance = usePromptEnhance({ prompt, setPrompt, mode, profile: currentProfile, imageId: referenceAsset?.id || "", limit: promptLimit, showToast, focus: focusPrompt });
   const profileOptions = currentProfile?.options || {};
   const aspectValue = `${width}x${height}`;
   // The size menu's tab: Custom is the size as typed; Default and 2K start from a preset (2K for images only).
@@ -1765,11 +1769,12 @@ function App() {
     value: referenceRole,
     onChange: (value: ReferenceRole) => setPrefs({ referenceRole: value })
   } : null;
-  const view = { ...baseView, loraMismatch, dismissLoraMismatch, setupTip, hideSetupTip, neverSetupTip, referenceAssets: composerReferenceAssets, referenceInputs: visibleReferenceInputs, referenceInpaint, referenceRole: referenceRoleControl };
+  const view = { ...baseView, loraMismatch, dismissLoraMismatch, setupTip, hideSetupTip, neverSetupTip, referenceAssets: composerReferenceAssets, referenceInputs: visibleReferenceInputs, referenceInpaint, referenceRole: referenceRoleControl, promptEnhance: prefs.promptEnhance === false ? null : promptEnhance };
   return (
     <>
       <StudioView view={view} />
       <HeissNodesDialog showToast={showToast} />
+      <EnhanceSetupDialog showToast={showToast} />
       {confirmationDialog}
     </>
   );

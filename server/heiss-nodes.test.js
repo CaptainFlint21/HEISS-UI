@@ -43,10 +43,10 @@ test("install, update, restart and ready, from what ComfyUI loaded and what's on
   assert.equal(fresh.state, "install");
   assert.ok(fresh.features.every((feature) => !feature.ready));
 
-  // A Rapid-only copy from before the version route: Rapid still runs, RTX and the inpaint stitch wait for the update.
+  // A Rapid-only copy from before the version route: Rapid still runs, RTX, the inpaint stitch and prompt enhance wait for the update.
   const old = heissNodesStatusFrom({ info: nodes("HeissRapid", "HeissRapidGuidance"), report: null, local: { present: true, git: true, head: "abc", version: 0 } });
   assert.deepEqual([old.state, old.loadedVersion], ["update", 2]);
-  assert.deepEqual(old.features.map((feature) => [feature.id, feature.ready]), [["rapid", true], ["rtx", false], ["inpaint", false]]);
+  assert.deepEqual(old.features.map((feature) => [feature.id, feature.ready]), [["rapid", true], ["rtx", false], ["inpaint", false], ["enhance", false]]);
   assert.equal(heissNodesStatusFrom({ info: nodes("HeissRapid"), local: null }).loadedVersion, 1);
 
   // Updated on disk, ComfyUI not restarted yet.
@@ -57,7 +57,7 @@ test("install, update, restart and ready, from what ComfyUI loaded and what's on
   assert.equal(ready.state, "ready");
   assert.ok(ready.features.every((feature) => feature.ready));
   // A newer pack than HEISS knows (someone updated it) is fine.
-  assert.equal(heissNodesStatusFrom({ info: allNodes, report: report(7) }).state, "ready");
+  assert.equal(heissNodesStatusFrom({ info: allNodes, report: report(nodePacks.heiss.version + 1) }).state, "ready");
   // ComfyUI elsewhere: nothing on disk to look at, the loaded nodes decide.
   assert.equal(heissNodesStatusFrom({ info: {}, local: null }).state, "install");
 });

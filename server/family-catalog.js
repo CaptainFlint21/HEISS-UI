@@ -73,6 +73,18 @@ export const encoderDownloads = {
   hidream_clip_g: [{ file: "clip_g_hidream.safetensors", url: hf("Comfy-Org/HiDream-I1_ComfyUI", "split_files/text_encoders/clip_g_hidream.safetensors"), bytes: 1_389_743_104, sha256: "3771e70e36450e5199f30bad61a53faae85a2e02606974bcda0a6a573c0519d5" }]
 };
 
+// Prompt enhance's vision LLM (prompt-enhance.js), loaded with CLIPLoader from models/text_encoders. All
+// uncensored, all small enough to run whole on an 8 GB card: one that only fits in part crawls (dynamic
+// VRAM streams its weights for every word). INT8 ConvRot stays INT8 on the GPU; an fp8 file is upcast on
+// cards before Ada, so those stay out.
+export const enhancerDownloads = {
+  vision: [
+    { file: "huihui_qwen3vl_4b_abliterated_int8_convrot.safetensors", label: "Qwen3-VL 4B", note: "Sharp eyes and quick on any 8 GB card.", url: hf("ahmed22xa/Huihui-Qwen3-VL-4B-Instruct-abliterated-comfy", "Huihui-Qwen3-VL-4B-Instruct-abliterated-int8_convrot.safetensors"), bytes: 5_064_440_625, sha256: "6a108cd7715c8e1300d4b82b2e671bdedcea65d07406ae454f00720444830209" },
+    { file: "qwen35_4b_uncensored_hauhaucs_int8_convrot.safetensors", label: "Qwen3.5 4B", note: "The richest writing. Wants 10 GB of graphics memory to stay quick.", url: hf("pwnyourace/Qwen3.5-4B-Uncensored-HauhauCS-Aggressive_INT8-convrot", "model.safetensors"), bytes: 5_518_036_472, sha256: "f61436a61313fe8f28bb25693483d4df87ab9757123835d28ad260ce3a0a3c09" },
+    { file: "qwen35_2b_heretic_int8_convrot.safetensors", label: "Qwen3.5 2B", note: "The fastest, and small enough for 6 GB cards. Simpler wording.", url: hf("Winnougan/ComfyUI-Heretic-Uncensored-Text-Encoders", "Qwen3.5-2B-Heretic_Winnougan-int8_convrot.safetensors"), bytes: 3_056_178_504, sha256: "73e70db4b26406a28b777cf6e77d440a3641e2028b1c67c5003539baa4bbdc01" }
+  ]
+};
+
 // Vision encoders that read a start image for image-to-video models (models/clip_vision).
 export const visionDownloads = {
   sigclip_384: [{ file: "sigclip_vision_patch14_384.safetensors", url: hf("Comfy-Org/sigclip_vision_384", "sigclip_vision_patch14_384.safetensors"), bytes: 856_505_640, sha256: "1fee501deabac72f0ed17610307d7131e3e9d1e838d0363aa3c2b97a6e03fb33" }]

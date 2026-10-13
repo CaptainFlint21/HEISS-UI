@@ -2,8 +2,9 @@ import React from 'react';
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowUp, Check, CheckCircle2, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, History, ImagePlus, Info, LockKeyhole, MoreHorizontal, RefreshCw, Search, Share, SlidersHorizontal, Square, Star, Trash2, Wand2, X } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Check, CheckCircle2, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, History, ImagePlus, Info, LockKeyhole, MoreHorizontal, RefreshCw, RotateCcw, Search, Share, SlidersHorizontal, Sparkles, Square, Star, Trash2, Undo2, Wand2, X } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
+import type { PromptEnhance } from './usePromptEnhance';
 import { familyLabel, setupNote } from './components';
 import { downloadUrl } from './GalleryTile';
 import { canUpscaleItem, shortLeft, upscaledWithRun, upscaleLeftLine, upscaleTooltip, useUpscaleClock } from './useUpscale';
@@ -539,8 +540,9 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
     aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, mode, count, countMeta, setCount, steps, stepsMeta, setSteps,
     referenceInputs, referenceInpaint, referenceRole, referenceAssets, selectReferenceAsset, removeReferenceAsset, confirmAction, showToast,
     generate, generateDisabled, generateDisabledReason, comfyStatus, retryComfyStatus, comfyRetrying, seed, setSeed, loraActiveCount, phoneAdvancedControls, generationEstimate,
-    customSize, sizeTier, sizeMax, customLimits, savedSizes
+    customSize, sizeTier, sizeMax, customLimits, savedSizes, promptEnhance
   } = view;
+  const enhance = promptEnhance as PromptEnhance | null;
   const [sheet, setSheet] = React.useState<'' | 'workflow' | 'size' | 'advanced'>('');
   const [showNegative, setShowNegative] = React.useState(Boolean(negative));
   const [historyOpen, setHistoryOpen] = React.useState(false);
@@ -590,7 +592,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
         </>
       }
     >
-      <div className="phone-compose">
+      <div className={cn('phone-compose', enhance?.busy && 'is-enhancing')}>
         <ReferenceSlots
           inputs={referenceInputs || []}
           inpaint={referenceInpaint}
@@ -622,14 +624,27 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
           value={prompt}
           placeholder={referenceInpaint?.mask ? 'Describe what the painted part becomes…' : hiddenSpace ? 'Describe what to make, privately…' : 'Describe what to make…'}
           onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))}
+          readOnly={Boolean(enhance?.busy)}
           rows={4}
           autoFocus={!prompt.trim()}
         />
-        {recentPrompts.length ? (
-          <button type="button" className="phone-compose-recent" onClick={() => { haptic('tap'); setHistoryOpen(true); }}>
-            <History size={15} /> Recent
-          </button>
-        ) : null}
+        <div className="phone-compose-tools">
+          {enhance?.settled ? (
+            <>
+              <button type="button" className="phone-compose-recent" onClick={() => { haptic('tap'); enhance.undo(); }}><Undo2 size={15} /> Undo</button>
+              <button type="button" className="phone-compose-recent" onClick={() => { haptic('tap'); enhance.again(); }}><RotateCcw size={15} /> Try again</button>
+            </>
+          ) : recentPrompts.length && !enhance?.busy ? (
+            <button type="button" className="phone-compose-recent" onClick={() => { haptic('tap'); setHistoryOpen(true); }}>
+              <History size={15} /> Recent
+            </button>
+          ) : null}
+          {enhance && !enhance.settled ? (
+            <button type="button" className={cn('phone-compose-recent phone-compose-enhance', enhance.busy && 'is-busy')} onClick={() => { haptic('tap'); enhance.run(); }}>
+              <Sparkles size={15} /> {enhance.busy ? <span className="enhance-shimmer">{enhance.working}</span> : 'Enhance'}
+            </button>
+          ) : null}
+        </div>
       </div>
       <PromptHistorySheet
         open={historyOpen}

@@ -13,6 +13,7 @@ HEISS's own ComfyUI pack ([ComfyUI-HEISS-UI-Nodes](https://github.com/tristmeist
 | `src/app/heissNodes.ts` | `requireHeissNodes(feature, then)`: runs `then` when the feature is ready, else opens the dialog and runs it once the feature is. |
 | `src/app/HeissNodesDialog.tsx` | The dialog: Install (or Update) → Restart → Ready, with what the pack brings. |
 | Settings › Features › HEISS UI Nodes | The version ComfyUI runs, and Set up / Update / Details. |
+| `POST /heiss/models/rescan` (pack 8) | Drops ComfyUI's cached model lists, so a model HEISS just downloaded is listed on drives whose folders never change their modified time (exFAT). Prompt enhance's setup calls it ([prompt-enhance.md](prompt-enhance.md)). |
 
 ## States
 
