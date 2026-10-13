@@ -177,7 +177,8 @@ function startedAt(entry) {
 function firstOutput(entry) {
   for (const output of Object.values(entry?.outputs || {})) {
     for (const [list, kind] of [[output?.images, "image"], [output?.gifs, "video"], [output?.videos, "video"], [output?.animated, "image"]]) {
-      const item = Array.isArray(list) ? list.find((value) => value?.filename) : null;
+      // Load Video shows the file it loaded as an "input" item: that's what the run was given, not what it made.
+      const item = Array.isArray(list) ? list.find((value) => value?.filename && value.type !== "input") : null;
       if (!item) continue;
       const params = new URLSearchParams({ filename: item.filename, subfolder: item.subfolder || "", type: item.type || "output" });
       const video = kind === "video" || /\.(mp4|webm|mov|mkv)$/i.test(item.filename);

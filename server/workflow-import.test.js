@@ -247,6 +247,15 @@ test("recent runs fold runs of one workflow into one entry, skip HEISS's own run
   assert.equal(workflowShape(picked.api), workflowShape(picked.variants[0]));
 });
 
+test("a recent video-to-video run shows what it made, not the video Load Video read", () => {
+  const [id, entry] = historyEntry("v", 4, "a fox", 3000);
+  // ComfyUI lists Load Video's own preview of its file first, as an "input" item.
+  entry.outputs = { 1: { images: [{ filename: "source.mp4", subfolder: "heiss-ui", type: "input" }], animated: [true] }, 5: { images: [{ filename: "made.mp4", subfolder: "heiss-ui", type: "output" }], animated: [true] } };
+  const [recent] = recentFromHistory({ [id]: entry });
+  assert.match(recent.preview || recent.url || JSON.stringify(recent), /made\.mp4/);
+  assert.doesNotMatch(JSON.stringify(recent), /source\.mp4/);
+});
+
 test("saved workflows: newest first, hidden folders left out, both listing shapes", () => {
   assert.deepEqual(savedWorkflowList(["b.json", ".trash/x.json", "notes.txt"]).map((item) => item.name), ["b"]);
   const list = savedWorkflowList([{ path: "old.json", modified: 100 }, { path: "sub/new.json", modified: 200 }]);
