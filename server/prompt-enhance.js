@@ -134,6 +134,23 @@ export function finishPrompt(target, text = "", family = "") {
   return tags.slice(0, promptLength(target, family)[1] + 5).join(", ");
 }
 
+/**
+ * Everything one enhancement asks the node for, from what the composer sent and
+ * the saved settings. /api/enhance and evals/enhance both build their runs here,
+ * so the eval measures exactly what the app sends.
+ */
+export function enhancePlan({ kind = "image", family = "", variant = "", text = "", hasImage = false, editing = false, again = false } = {}, settings = enhanceDefaults) {
+  const target = enhanceTarget({ kind, family, variant, hasImage, hasText: Boolean(String(text).trim()), editing });
+  return {
+    target,
+    system: systemPrompt(target, { family, variant, instructions: settings.instructions }),
+    prompt: userTurn(target, text),
+    maxTokens: tokenBudget(target, family),
+    // "Again" asks for another take: a little more freedom than the first.
+    temperature: Math.min(1.2, settings.creativity + (again ? 0.15 : 0))
+  };
+}
+
 /* ------------------------------------------------------------ Settings */
 
 const settingsFile = path.join(dataDir, "prompt-enhance.json");
@@ -214,7 +231,7 @@ function failureIn(entry) {
  *   { type: "queued" }            - waiting for ComfyUI to finish what it is doing
  *   { type: "loading" }           - started: the model is loading or reading
  *   { type: "text", text }        - the prompt so far
- *   { type: "done", text }        - the finished prompt
+ *   { type: "done", text, stats } - the finished prompt, and the node's own count: { tokens, seconds }
  * Resolves with the finished prompt; throws with a message a person can read.
  * `signal` stops it, and the run in ComfyUI with it.
  */
@@ -227,6 +244,7 @@ export async function runEnhance({ model, system, prompt, image = "", maxTokens,
   let finished = "";
   let failed = "";
   let phase = "";
+  let stats = null;
   // queued, then loading, each said once, whichever of the socket and the queue says it first.
   const step = (type) => { if (phase !== type && phase !== "loading") { phase = type; emit({ type }); } };
   let wake = () => {};
@@ -251,9 +269,14 @@ export async function runEnhance({ model, system, prompt, image = "", maxTokens,
     if (message.type === "heiss.enhance" && data.id === streamId) {
       if (data.done) finished = String(data.text || "");
       else if (data.text) emit({ type: "text", text: String(data.text) });
-      if (data.done) wake();
+      // "executed" follows with the node's token count; it's not worth waiting long for.
+      if (data.done) setTimeout(() => wake(), 250);
     } else if (data.prompt_id && data.prompt_id === promptId) {
       if (message.type === "execution_start") step("loading");
+      if (message.type === "executed" && data.node === "enhance") {
+        stats = { tokens: Number(data.output?.tokens?.[0]) || 0, seconds: Number(data.output?.seconds?.[0]) || 0 };
+        if (finished) wake();
+      }
       if (message.type === "execution_error") { failed = String(data.exception_message || "").trim() || "ComfyUI couldn't run the enhancer."; wake(); }
       if (message.type === "execution_interrupted") { failed = "Stopped."; wake(); }
     }
@@ -281,7 +304,7 @@ export async function runEnhance({ model, system, prompt, image = "", maxTokens,
     }
     if (signal?.aborted) throw Object.assign(new Error("Stopped."), { stopped: true });
     if (failed) throw new Error(friendlyFailure(failed));
-    emit({ type: "done", text: finished });
+    emit({ type: "done", text: finished, stats });
     return finished;
   } finally {
     signal?.removeEventListener("abort", stop);
