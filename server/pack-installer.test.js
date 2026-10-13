@@ -43,3 +43,13 @@ test("a listed pack installs through the Manager 3 custom node's queue", { timeo
   assert.ok(calls.includes("POST /manager/queue/install"));
   assert.ok(calls.includes("POST /manager/queue/start"));
 });
+
+test("git inside a pack folder trusts that folder only, so drives without owners (exFAT, shares) still update", async () => {
+  const { gitArgsIn } = await import("./pack-installer.js");
+  const path = (await import("node:path")).default;
+  const args = gitArgsIn(path.join("D:", "ComfyUI", "custom_nodes", "ComfyUI-HEISS-UI-Nodes"), ["rev-parse", "HEAD"]);
+  assert.equal(args[0], "-c");
+  assert.match(args[1], /^safe\.directory=.*ComfyUI\/custom_nodes\/ComfyUI-HEISS-UI-Nodes$/);
+  assert.doesNotMatch(args[1], /\\|=\*$/, "forward slashes, and never every folder");
+  assert.deepEqual(args.slice(2), ["rev-parse", "HEAD"]);
+});
