@@ -82,7 +82,7 @@ function customAspectSet(defaults, ratios = [], ranges = {}) {
   }).length ? aspectSet(defaults, ratios.map((item) => Array.isArray(item) ? item : [item.label || item.value || "Custom", Number(item.w || 1), Number(item.h || 1)]), ranges) : [];
 }
 
-export function buildProfile({ id, kind, label, displayName, description, model, baseModel, workflow, family, defaults, aspects, options = {}, capabilities = {}, constraints = {}, mediaInputs = [], aspectPolicy = "manual", maxLoras = 8, native = {} }) {
+export function buildProfile({ id, kind, label, displayName, description, model, baseModel, workflow, family, defaults, aspects, options = {}, capabilities = {}, constraints = {}, mediaInputs = [], aspectPolicy = "manual", maxLoras = 8, native = {}, settings = [] }) {
   return {
     id,
     kind,
@@ -99,6 +99,7 @@ export function buildProfile({ id, kind, label, displayName, description, model,
     options,
     constraints,
     mediaInputs,
+    ...(settings.length ? { settings } : {}),
     aspectPolicy: aspectPolicy === "reference" ? "reference" : "manual",
     // Whether the model draws 2K/4K itself, per size: "yes" or "maybe" (family catalog); {} for anything else.
     native: kind === "image" ? Object.fromEntries(Object.entries(native || {}).filter(([size, level]) => ["2k", "4k"].includes(size) && ["yes", "maybe"].includes(level))) : {},
@@ -201,6 +202,7 @@ export function inferModels(info, stats = {}) {
       capabilities: workflow.capabilities,
       mediaInputs: workflow.mediaInputs || [],
       aspectPolicy: workflow.aspectPolicy,
+      settings: workflow.settings || [],
       maxLoras: workflow.loraStack?.max
     }));
   }

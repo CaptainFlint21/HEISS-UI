@@ -193,6 +193,8 @@ export function useGenerationActions(view: any) {
         ...(inpaint ? { inpaint } : {}),
         startImageId: canUseStartImage ? startImageId : "",
         startImageName,
+        // An imported workflow's "More settings" the person changed; the rest keep the workflow's values.
+        ...(view.workflowSettings && Object.keys(view.workflowSettings).length ? { workflowSettings: view.workflowSettings } : {}),
         privateVault: Boolean(hiddenSpace),
         // RTX upscale for a video run (server/rtx.js); the server drops it where the machine can't, and says why.
         rtxVideo: mode === "video" && !hiddenSpace && prefs.smartUpscale !== false && rtxOffered() && (prefs.videoUpscale === "2k" || prefs.videoUpscale === "4k")
