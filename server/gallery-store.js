@@ -975,6 +975,8 @@ export function generationSettings(body) {
       if (body.inpaint.image?.width) settings.inpaint.image = { width: body.inpaint.image.width, height: body.inpaint.image.height };
       // The reference's id lets the live preview draw over the original; a Hidden one stays out of the record.
       if (body.inpaint.referenceId && !body.privateVault && !String(body.inpaint.referenceId).startsWith("vault:")) settings.inpaint.referenceId = body.inpaint.referenceId;
+      // What HEISS Inpaint Stitch corrected at the seam (jobs.js, from its report).
+      if (body.inpaintSeam) settings.inpaintSeam = String(body.inpaintSeam);
     }
   }
   if (body.kind === "video") {

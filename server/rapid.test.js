@@ -149,7 +149,7 @@ test("the A1111 parameters say Rapid made it", () => {
 test("HEISS UI Nodes is a pinned pack like every other", () => {
   const pack = nodePack("heiss");
   assert.match(pack.commit, /^[0-9a-f]{40}$/);
-  assert.deepEqual(pack.nodes, ["HeissRapid", "HeissRapidGuidance", "HeissRTXVideo", "HeissRTXUpscale"]);
+  assert.deepEqual(pack.nodes, ["HeissRapid", "HeissRapidGuidance", "HeissRTXVideo", "HeissRTXUpscale", "HeissInpaintStitch"]);
   assert.equal(pack.repository, "https://github.com/tristmeister/ComfyUI-HEISS-UI-Nodes.git");
 });
 

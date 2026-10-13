@@ -36,6 +36,16 @@ version opens with a `> ` summary line, which the update pill shows.
   offers the update, for git installs, zips and Manager installs alike (an
   older copy is set aside, never deleted). Settings › Features shows which
   version ComfyUI runs.
+- **Inpainting: seamless edges with edit models.** Qwen-Image and Flux.2
+  repaint the whole crop and often shift, zoom or tint it a little, which
+  showed as doubled lines where the painted edge crosses something, or a
+  patch a shade off. With HEISS UI Nodes (Settings › Features › Inpainting
+  sets them up, like Rapid), the result is lined up and colour matched
+  on the ring around the paint before it goes into the picture. A correction
+  is only made when it is plausible and actually helps, a big colour change
+  you asked for is left alone, and everything outside the paint stays the
+  original's exact pixels. The picture's details say what it corrected.
+  Idea after Inpaint Canvas by DenRakEiw.
 - **Docker support.** `docker compose up --build` runs the studio in a
   container next to your ComfyUI, keeping its data on a volume and serving
   the gallery from ComfyUI's output folder. A plain Dockerfile (multi-stage,
@@ -64,6 +74,11 @@ version opens with a `> ` summary line, which the update pill shows.
   The inpainting brush belongs to Edit, so it hides while Ref is on.
 
 ### Changed
+- **Inpainting: the painted part is always fully replaced.** The soft edge
+  now sits just outside the paint, on pixels the model repainted, instead of
+  partly inside it, where a faint ghost of the original could show. How far
+  the repaint and the soft edge reach now follows the size of what you
+  painted (after Krita AI's defaults) instead of the crop's size.
 - **A tighter size menu.** Default and the ratio it already is share one
   row, rows are more compact, and 2.35:1 is gone.
 - **A 2K/4K pick survives a reference.** It is skipped while an edited

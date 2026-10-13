@@ -23,15 +23,15 @@ export const nodePacks = {
     name: "HEISS UI Nodes",
     repository: "https://github.com/tristmeister/ComfyUI-HEISS-UI-Nodes.git",
     folder: "ComfyUI-HEISS-UI-Nodes",
-    commit: "ce57bfaa3d030efaea90dc88e838313ab9f5ba0d",
+    commit: "4c3c6e213131b9c06883d9c9e5d5995aafec9b55",
     ref: "main, 2026-10-13",
     search: "HEISS UI",
     // It grows with HEISS: an installed older copy is updated to `commit` (pack-installer.js).
     update: true,
     // PACK_VERSION in the pack's heiss_info.py at `commit`; what each feature needs is in heiss-nodes.js.
-    version: 3,
+    version: 4,
     versionFile: "heiss_info.py",
-    nodes: ["HeissRapid", "HeissRapidGuidance", "HeissRTXVideo", "HeissRTXUpscale"]
+    nodes: ["HeissRapid", "HeissRapidGuidance", "HeissRTXVideo", "HeissRTXUpscale", "HeissInpaintStitch"]
   },
   // RTX upscaling's second part (docs/rtx-video.md): NVIDIA's own package, into ComfyUI's Python, from the
   // same pack's requirements-rtx.txt, which NVIDIA cards alone ever install. Same folder and commit as `heiss`.
@@ -39,7 +39,7 @@ export const nodePacks = {
     name: "NVIDIA RTX video package",
     repository: "https://github.com/tristmeister/ComfyUI-HEISS-UI-Nodes.git",
     folder: "ComfyUI-HEISS-UI-Nodes",
-    commit: "ce57bfaa3d030efaea90dc88e838313ab9f5ba0d",
+    commit: "4c3c6e213131b9c06883d9c9e5d5995aafec9b55",
     ref: "main, 2026-10-13",
     update: true,
     requirements: "requirements-rtx.txt",

@@ -28,7 +28,7 @@ import { HuggingFaceTokenSettings } from './HuggingFaceToken';
 import { OtherDevicesGroup } from './OtherDevices';
 import { TrashRow } from './TrashRow';
 import { loadRtxStatus, rtxStageLine, useRtxStatus } from './rtx';
-import { loadHeissNodes, openHeissNodes, useHeissNodes } from './heissNodes';
+import { featureReady, loadHeissNodes, openHeissNodes, useHeissNodes } from './heissNodes';
 import type { ShowToast } from './toast';
 
 export const SETTINGS_SECTIONS = [
@@ -410,6 +410,25 @@ function HeissNodesRow() {
   return (
     <Row label="HEISS UI Nodes" description={<>HEISS’s own small add-on for ComfyUI, behind Rapid and RTX video upscale.<br />{line}</>}>
       <button className={cn('btn', (status?.state === 'install' || status?.state === 'update') ? 'is-primary' : 'is-ghost')} onClick={() => openHeissNodes()}>{label}</button>
+    </Row>
+  );
+}
+
+/** Inpainting's seam correction (HEISS Inpaint Stitch): on with HEISS UI Nodes, else one button sets them up. */
+function InpaintSeamRow() {
+  const { status } = useHeissNodes();
+  React.useEffect(() => { loadHeissNodes(); }, []);
+  if (!status) return null;
+  const ready = featureReady(status, 'inpaint');
+  return (
+    <Row label="Seamless edges" description={ready
+      ? 'On. Edit models like Qwen-Image and Flux.2 shift and tint what they repaint a little; HEISS UI Nodes line it up and match its colour before it goes into the picture.'
+      : 'Edit models like Qwen-Image and Flux.2 shift and tint what they repaint a little, which can show as doubled lines or a patch a shade off. HEISS UI Nodes line it up and match its colour before it goes into the picture. Without them, inpainting works as before.'} stacked={!ready}>
+      {ready ? null : (
+        <div className="set-node-install">
+          <button type="button" className="btn is-primary" onClick={() => openHeissNodes('inpaint')}><Download size={14} /> {status.state === 'update' ? 'Update HEISS UI Nodes' : 'Set up HEISS UI Nodes'}</button>
+        </div>
+      )}
     </Row>
   );
 }
@@ -1063,6 +1082,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
                       <InpaintSuggestions onGetModels={onGetModels} />
                     )}
                     <Row label="Strength and edge softness" description={`While a painted image is in the prompt bar, both are in ${phoneDevice ? 'the Advanced sheet' : 'the sidebar’s Basics, under the image'}. Strength is there for models that take a start image.`} />
+                    <InpaintSeamRow />
                     <InpaintDemo />
                   </>
                 ) : null}

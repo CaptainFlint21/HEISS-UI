@@ -1,9 +1,10 @@
-import { missingNodes, nodeRange, optionsFor } from './comfy.js';
+import { hasNode, missingNodes, nodeRange, optionsFor } from './comfy.js';
 import { inferModels } from './models.js';
 import { workflowFor, workflowIds } from './workflow-registry.js';
 import { getCustomWorkflow } from './custom-workflows.js';
 import { inpaintingEnabled } from './features.js';
 import { families, guidanceFor, rapidFor } from './family-catalog.js';
+import { inpaintStitchNode } from './inpaint.js';
 
 export function clampNumber(value, fallback, min, max) {
   const number = Number(value);
@@ -64,9 +65,11 @@ function sanitizeLoras(input = {}, info = {}, profile = null, kind = "image", ma
 /**
  * A painted mask on the first reference: only for a model that can inpaint,
  * with a reference to paint on. The mask itself is checked when it is read
- * (inpaint.js); here only its shape and the two settings.
+ * (inpaint.js); here only its shape and the two settings, and whether this
+ * ComfyUI has HEISS Inpaint Stitch, which lines the result up and matches its
+ * colour before it goes back in (the plain composite otherwise).
  */
-function sanitizeInpaint(input, profile, referenceAssets) {
+function sanitizeInpaint(input, profile, referenceAssets, info) {
   const mask = String(input.inpaint?.mask || "");
   if (!inpaintingEnabled || !mask || !profile.capabilities.inpaint || !referenceAssets.length) return null;
   if (!mask.startsWith("data:image/png;base64,")) throw new Error("The painted mask didn’t come through. Paint it again.");
@@ -76,7 +79,8 @@ function sanitizeInpaint(input, profile, referenceAssets) {
   return {
     mask,
     strength: Number.isFinite(strength) ? Math.round(Math.min(1, Math.max(0.05, strength)) * 100) / 100 : fallback,
-    feather: Number.isFinite(feather) ? Math.min(1, Math.max(0, feather)) : 0.4
+    feather: Number.isFinite(feather) ? Math.min(1, Math.max(0, feather)) : 0.4,
+    stitchNode: hasNode(info, inpaintStitchNode)
   };
 }
 
@@ -167,7 +171,7 @@ function sanitizeFamilyBody(input, info, stats) {
   if (profile.capabilities.startImageRequired && !referenceAssets.length && !input.startImage && !input.startImageId) {
     throw new Error(`${profile.displayName} makes a video from a picture. Add a start image first.`);
   }
-  const inpaint = sanitizeInpaint(input, profile, referenceAssets);
+  const inpaint = sanitizeInpaint(input, profile, referenceAssets, info);
   const cfg = snapNumber(input.cfg, profile.defaults.cfg, c.cfg);
   return {
     kind,

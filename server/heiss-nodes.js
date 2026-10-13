@@ -30,6 +30,14 @@ export const heissFeatures = [
     version: 3,
     // Only offered on an NVIDIA card; its second part is NVIDIA's own package (rtx.js).
     nvidia: true
+  },
+  {
+    id: "inpaint",
+    label: "Seamless inpainting",
+    blurb: "What edit models repaint, lined up and colour matched, so no seam shows.",
+    // Inpainting works without it (ComfyUI's plain composite); with it, the stitch corrects (inpaint.js).
+    nodes: ["HeissInpaintStitch"],
+    version: 4
   }
 ];
 

@@ -18,7 +18,7 @@ const { packInstallState, packVersionOnDisk, startPackInstall } = await import("
 const root = path.join(scratch, "ComfyUI");
 const folder = path.join(root, "custom_nodes", nodePacks.heiss.folder);
 const nodes = (...names) => Object.fromEntries(names.map((name) => [name, {}]));
-const allNodes = nodes("HeissRapid", "HeissRapidGuidance", "HeissRTXVideo", "HeissRTXUpscale");
+const allNodes = nodes(...nodePacks.heiss.nodes);
 const report = (version) => ({ pack: "heiss-ui-nodes", version, commit: "", nodes: [] });
 const writeCopy = (version, { git = false } = {}) => {
   fs.rmSync(folder, { recursive: true, force: true });
@@ -43,17 +43,17 @@ test("install, update, restart and ready, from what ComfyUI loaded and what's on
   assert.equal(fresh.state, "install");
   assert.ok(fresh.features.every((feature) => !feature.ready));
 
-  // A Rapid-only copy from before the version route: Rapid still runs, RTX waits for the update.
+  // A Rapid-only copy from before the version route: Rapid still runs, RTX and the inpaint stitch wait for the update.
   const old = heissNodesStatusFrom({ info: nodes("HeissRapid", "HeissRapidGuidance"), report: null, local: { present: true, git: true, head: "abc", version: 0 } });
   assert.deepEqual([old.state, old.loadedVersion], ["update", 2]);
-  assert.deepEqual(old.features.map((feature) => [feature.id, feature.ready]), [["rapid", true], ["rtx", false]]);
+  assert.deepEqual(old.features.map((feature) => [feature.id, feature.ready]), [["rapid", true], ["rtx", false], ["inpaint", false]]);
   assert.equal(heissNodesStatusFrom({ info: nodes("HeissRapid"), local: null }).loadedVersion, 1);
 
   // Updated on disk, ComfyUI not restarted yet.
-  const waiting = heissNodesStatusFrom({ info: nodes("HeissRapid", "HeissRapidGuidance"), local: { present: true, git: true, head: nodePacks.heiss.commit, version: 3 } });
+  const waiting = heissNodesStatusFrom({ info: nodes("HeissRapid", "HeissRapidGuidance"), local: { present: true, git: true, head: nodePacks.heiss.commit, version: nodePacks.heiss.version } });
   assert.deepEqual([waiting.state, waiting.local.onPin], ["restart", true]);
 
-  const ready = heissNodesStatusFrom({ info: allNodes, report: report(3), local: null });
+  const ready = heissNodesStatusFrom({ info: allNodes, report: report(nodePacks.heiss.version), local: null });
   assert.equal(ready.state, "ready");
   assert.ok(ready.features.every((feature) => feature.ready));
   // A newer pack than HEISS knows (someone updated it) is fine.

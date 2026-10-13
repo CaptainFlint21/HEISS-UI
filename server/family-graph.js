@@ -394,13 +394,17 @@ function customSampler(add, { seed, sampler, guider, sigmas, latent, rapid = nul
  * Lays the sampled crop back onto the original: scaled to the box it came
  * from and blended through the feathered stitch mask. The destination is the
  * reference as ComfyUI loaded it, so everything outside the mask is the
- * original's own pixels.
+ * original's own pixels. With HEISS Inpaint Stitch (HEISS UI Nodes) the crop
+ * is first lined up and colour matched on the ring around the mask, which
+ * edit models shift, zoom and tint; without it, ComfyUI's plain composite.
  */
 function stitchInpaint(add, images, inpaint, count) {
   const { box } = inpaint;
-  const source = [add("ImageScale", { image: images, upscale_method: "lanczos", width: box.width, height: box.height, crop: "disabled" }), 0];
   let destination = [add("LoadImage", { image: inpaint.original }), 0];
-  if (count > 1) destination = [add("RepeatImageBatch", { image: destination, amount: count }), 0];
   const mask = [add("LoadImageMask", { image: inpaint.composite, channel: "red" }), 0];
+  // It scales the crop itself and gives one picture per crop of the batch.
+  if (inpaint.stitchNode) return [add("HeissInpaintStitch", { original: destination, image: images, mask, x: box.x, y: box.y, align: true, color_match: true }), 0];
+  const source = [add("ImageScale", { image: images, upscale_method: "lanczos", width: box.width, height: box.height, crop: "disabled" }), 0];
+  if (count > 1) destination = [add("RepeatImageBatch", { image: destination, amount: count }), 0];
   return [add("ImageCompositeMasked", { destination, source, x: box.x, y: box.y, resize_source: false, mask }), 0];
 }

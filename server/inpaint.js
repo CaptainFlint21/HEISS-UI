@@ -14,6 +14,10 @@ import { loadSharp } from "./sharp-loader.js";
 // The nodes every inpaint graph needs on top of the family's own; all are ComfyUI core.
 export const inpaintNodes = ["SetLatentNoiseMask", "LoadImageMask", "ImageScale", "ImageCompositeMasked", "RepeatImageBatch", "RepeatLatentBatch", "SplitSigmasDenoise"];
 
+// HEISS UI Nodes' stitch: lines the result up and matches its colour on the ring around the
+// mask before it goes back in. Without it the stitch is ComfyUI's plain ImageCompositeMasked.
+export const inpaintStitchNode = "HeissInpaintStitch";
+
 const maxMaskBytes = 16 * 1024 * 1024;
 // Below this a painted pixel is a stray brush edge, not part of the mask.
 const maskThreshold = 26;
@@ -75,11 +79,52 @@ export function inpaintGeometry({ imageWidth, imageHeight, bounds, targetPixels 
   return { box: { x, y, width, height }, work: { width: workWidth, height: workHeight } };
 }
 
-/** How far the seam fades, from the 0–1 "edge softness" setting, for a box this size. */
-export function featherSigma(softness, box) {
-  const side = Math.min(box.width, box.height);
-  // Narrow on purpose: an edit model shifts things a little, and a wide blend shows that as ghosting.
-  return Math.max(0.6, Math.min(1, Math.max(0, Number(softness) || 0)) * side * 0.02);
+/**
+ * How far the repainted area reaches past the paint, and how wide the seam is,
+ * in image pixels, from the painted area's size and the 0–1 "edge softness"
+ * setting (after Krita AI's defaults: a feather of 10 % of the painted area's
+ * diagonal, at least 32 px, and a grow of 4 px plus half of it). The seam sits
+ * entirely on repainted pixels, outside the paint, so the paint itself is
+ * always fully replaced.
+ */
+export function inpaintEdges(bounds, softness) {
+  const feather = Math.max(0.1 * Math.hypot(bounds.width, bounds.height), 32);
+  const grow = Math.round(4 + feather / 2);
+  const blend = Math.round(grow * 1.25 * Math.min(1, Math.max(0, Number(softness) || 0)));
+  return { grow, blend };
+}
+
+/**
+ * A square max filter of a one-channel buffer by `radius` pixels (van Herk /
+ * Gil-Werman: a few comparisons a pixel whatever the radius). Outside the
+ * buffer counts as 0.
+ */
+export function dilateMask(data, width, height, radius) {
+  const r = Math.max(0, Math.round(radius));
+  if (!r) return Uint8Array.from(data);
+  const k = 2 * r + 1;
+  const longest = Math.max(width, height);
+  const padded = new Uint8Array(longest + 2 * r);
+  const ahead = new Uint8Array(padded.length);
+  const behind = new Uint8Array(padded.length);
+  const line = (read, write, n) => {
+    padded.fill(0);
+    for (let i = 0; i < n; i += 1) padded[i + r] = read(i);
+    const m = n + 2 * r;
+    for (let i = 0; i < m; i += 1) ahead[i] = i % k === 0 ? padded[i] : Math.max(ahead[i - 1], padded[i]);
+    for (let i = m - 1; i >= 0; i -= 1) behind[i] = (i + 1) % k === 0 || i === m - 1 ? padded[i] : Math.max(behind[i + 1], padded[i]);
+    for (let i = 0; i < n; i += 1) write(i, Math.max(behind[i], ahead[i + 2 * r]));
+  };
+  const rows = new Uint8Array(width * height);
+  for (let y = 0; y < height; y += 1) line((x) => data[y * width + x], (x, v) => { rows[y * width + x] = v; }, width);
+  const out = new Uint8Array(width * height);
+  for (let x = 0; x < width; x += 1) line((y) => rows[y * width + x], (y, v) => { out[y * width + x] = v; }, height);
+  return out;
+}
+
+function erodeMask(data, width, height, radius) {
+  const inverted = dilateMask(data.map((value) => 255 - value), width, height, radius);
+  return inverted.map((value) => 255 - value);
 }
 
 export function maskBufferFromDataUrl(dataUrl) {
@@ -122,16 +167,23 @@ export async function inpaintFiles(sharp, sourceBuffer, maskBuffer, { targetPixe
     .png()
     .toBuffer();
   const boxMask = await rawGray(gray(mask, imageWidth, imageHeight).extract(region));
-  // Sampling: hard and grown a little past the paint. A soft sampling mask (differential
+  const { grow, blend } = inpaintEdges(bounds, feather);
+  // Sampling: hard, the paint grown by `grow`. A soft sampling mask (differential
   // diffusion) gives its edge only the last step or two, which few-step and edit models
   // leave half-denoised: grey grain and a ghost of the original. Softness belongs to the stitch.
-  const workMask = await rawGray(gray(boxMask, box.width, box.height).resize(work.width, work.height, { fit: "fill" }));
-  const grown = await rawGray(gray(workMask, work.width, work.height).blur(Math.max(1, Math.min(work.width, work.height) * 0.012)));
-  const samplingMask = await pngGray(gray(grown, work.width, work.height).threshold(12));
-  // Stitching: at the box's own size, feathered by the edge-softness setting.
-  // The solid core grows a little past the paint, so the soft band sits on repainted pixels (the sampling mask is grown too).
-  const compositeMask = await pngGray(gray(await rawGray(gray(boxMask, box.width, box.height).blur(featherSigma(feather, box))), box.width, box.height).linear(1.6, 0));
-  return { box, work, crop, samplingMask, compositeMask, image: { width: imageWidth, height: imageHeight } };
+  const repainted = dilateMask(boxMask.map((value) => (value >= maskThreshold ? 255 : 0)), box.width, box.height, grow);
+  const samplingMask = await pngGray(gray(Buffer.from(repainted), box.width, box.height).resize(work.width, work.height, { fit: "fill" }).threshold(128));
+  // Stitching, at the box's own size: the repainted area shrunk by most of the seam's
+  // width, then blurred, so the soft band lies on repainted pixels and ends where they
+  // do; never below the paint, which is always fully replaced.
+  const compositeRaw = Buffer.from(boxMask);
+  if (blend >= 1) {
+    const core = erodeMask(repainted, box.width, box.height, Math.round(blend * 0.8));
+    const soft = await rawGray(gray(Buffer.from(core), box.width, box.height).blur(Math.max(0.3, blend / 2.5)));
+    for (let index = 0; index < compositeRaw.length; index += 1) compositeRaw[index] = Math.max(boxMask[index], soft[index]);
+  }
+  const compositeMask = await pngGray(gray(compositeRaw, box.width, box.height));
+  return { box, work, crop, samplingMask, compositeMask, edges: { grow, blend }, image: { width: imageWidth, height: imageHeight } };
 }
 
 /**
@@ -167,11 +219,31 @@ export async function prepareInpaint(req, body) {
     image: files.image,
     referenceId: String(reference.assetId),
     strength: body.inpaint.strength,
-    feather: body.inpaint.feather
+    feather: body.inpaint.feather,
+    stitchNode: Boolean(body.inpaint.stitchNode)
   };
 }
 
 /** The staged file names an inpaint run adds, for cleanup after Hidden runs. */
 export function inpaintInputNames(inpaint) {
   return inpaint ? [inpaint.crop, inpaint.mask, inpaint.composite].filter(Boolean) : [];
+}
+
+/**
+ * What HEISS Inpaint Stitch did to a run's pictures, from its report, in a few
+ * words for the picture's details ("Lined up 4 px · colour matched"), or "".
+ */
+export function seamSummary(results) {
+  const list = Array.isArray(results) ? results : [];
+  if (!list.length) return "";
+  const aligned = list.map((result) => result?.align).filter((align) => align?.aligned);
+  const matched = list.some((result) => result?.color?.matched);
+  const parts = [];
+  if (aligned.length) {
+    const moved = Math.max(...aligned.map((align) => Math.hypot(Number(align.shift?.[0]) || 0, Number(align.shift?.[1]) || 0)));
+    const zoom = Math.max(...aligned.map((align) => Math.abs((Number(align.scale?.[0]) || 1) - 1)));
+    parts.push(`Lined up ${Math.round(moved * 10) / 10} px${zoom >= 0.005 ? `, ${Math.round(zoom * 1000) / 10}% zoom` : ""}`);
+  }
+  if (matched) parts.push(parts.length ? "colour matched" : "Colour matched");
+  return parts.length ? parts.join(" · ") : "Nothing to correct";
 }

@@ -1,6 +1,6 @@
 # HEISS UI Nodes: installing and keeping the pack current
 
-HEISS's own ComfyUI pack ([ComfyUI-HEISS-UI-Nodes](https://github.com/tristmeister/ComfyUI-HEISS-UI-Nodes)) carries every feature that needs custom nodes: Rapid, Rapid Guidance and RTX video upscale so far. People install it once, the first time they touch one of those features, and HEISS offers an update whenever a newer HEISS needs a newer pack.
+HEISS's own ComfyUI pack ([ComfyUI-HEISS-UI-Nodes](https://github.com/tristmeister/ComfyUI-HEISS-UI-Nodes)) carries every feature that needs custom nodes: Rapid, Rapid Guidance, RTX video upscale and the inpaint stitch so far. People install it once, the first time they touch one of those features, and HEISS offers an update whenever a newer HEISS needs a newer pack.
 
 ## The pieces
 

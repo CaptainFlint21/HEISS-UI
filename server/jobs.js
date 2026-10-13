@@ -17,6 +17,7 @@ import { markWorkflowUsed } from './workflow-catalog.js';
 import { remainingMs, RunTimer, slowSteps } from './generation-timing.js';
 import { generationEstimate, generationWarm, recordGeneration, recordUpscale, upscaleEstimate } from './timings.js';
 import { upscaleLeftMs, upscaleWork } from './upscale-timing.js';
+import { seamSummary } from './inpaint.js';
 
 export const jobs = new Map();
 const previewSlots = new Map();
@@ -324,6 +325,12 @@ function watchProgress(id, run, socket = openProgressSocket(id), graph = {}) {
       if (message.type === "heiss.rapid") {
         const body = jobBodies.get(id);
         if (body?.rapid) body.rapidReport = { active: Boolean(data.active), reason: String(data.reason || ""), smallSteps: Number(data.small_steps || 0), fullSteps: Number(data.full_steps || 0), switchNoise: Number(data.switch_noise || 0) };
+        return;
+      }
+      // HEISS Inpaint Stitch says what it corrected; the picture's details show it.
+      if (message.type === "heiss.inpaint") {
+        const body = jobBodies.get(id);
+        if (body?.inpaint) body.inpaintSeam = seamSummary(data.results);
         return;
       }
       const timing = runTimings.get(id);
