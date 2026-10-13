@@ -11,6 +11,21 @@ import { forgetComfyRun } from "./hidden-traces.js";
 import { releaseHiddenRun, rememberHiddenRun } from "./hidden-runs.js";
 import { attachVaultUpscale, patchVaultItem, setRuntimeUpscale } from "./vault.js";
 
+/**
+ * The finished upscale's file from its ComfyUI history entry. A run ComfyUI
+ * stopped with an error has a history entry too: that's a failure, with
+ * ComfyUI's own message, whatever its other nodes left behind.
+ */
+export function upscaleResult(entry, rtx) {
+  if (entry?.status?.status_str === "error") {
+    const failure = (entry.status.messages || []).find(([type]) => type === "execution_error")?.[1];
+    throw new Error(failure?.exception_message || "ComfyUI stopped the upscale with an error.");
+  }
+  const output = outputsFrom(entry).find((item) => item.type === (rtx ? "video" : "image"));
+  if (!output) throw new Error(rtx ? "The upscale ended without a video." : "The upscale ended without an image.");
+  return output;
+}
+
 export function findUpscaleTarget(id) {
   return gallery.find((item) => item.id === id || item.url === id) || null;
 }
@@ -201,9 +216,7 @@ export async function runUpscaleJob(jobId, body, info, target = galleryTarget(bo
         continue;
       }
       if (checked.state === "done") {
-        const outputs = outputsFrom(checked.entry);
-        const output = outputs.find((item) => item.type === (rtx ? "video" : "image"));
-        if (!output) throw new Error(rtx ? "The upscale ended without a video." : "The upscale ended without an image.");
+        const output = upscaleResult(checked.entry, rtx);
         // Learned from, unless it is Hidden's or its start was never heard.
         const startAt = clock.startAt();
         if (startAt && !target.hidden) recordUpscale({ ...learn, ms: (run.endAt ?? Date.now()) - startAt, predicted: estimate });

@@ -8,7 +8,7 @@ import test from "node:test";
 const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-output-"));
 process.env.COMFY_OUTPUT_DIR = outputDir;
 process.env.HEISS_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-data-"));
-const { galleryDelta, galleryRevisionValue, hideGalleryItems, makePendingItems, pageGallery, replaceGalleryJob, setGallery } = await import("./gallery-store.js");
+const { galleryDelta, galleryRevisionValue, hideGalleryItems, makePendingItems, outputsFrom, pageGallery, replaceGalleryJob, setGallery } = await import("./gallery-store.js");
 
 const url = (filename) => `/comfy/view?${new URLSearchParams({ filename, subfolder: "", type: "output" })}`;
 
@@ -72,4 +72,16 @@ test("an image shown upscaled is used upscaled, at the original's size", async (
   const original = await bytesForReference({ headers: {} }, id);
   const { data: originalData } = await sharp(original.buffer).raw().toBuffer({ resolveWithObject: true });
   assert.ok(originalData[0] < 50);
+});
+
+test("what a run loaded isn't one of its outputs: an RTX upscale gets the upscaled video, not Load Video's source", () => {
+  // ComfyUI's history of an RTX upscale (rtxVideoGraph): Load Video lists the file it read, type "input", first.
+  const history = { outputs: {
+    1: { images: [{ filename: "video_00002_.mp4", subfolder: "heiss-ui", type: "input" }], animated: [true] },
+    2: { images: [{ filename: "upscale_00011_.mp4", subfolder: "heiss-ui", type: "output" }], animated: [true] }
+  } };
+  const outputs = outputsFrom(history);
+  assert.equal(outputs.length, 1);
+  assert.equal(outputs[0].type, "video");
+  assert.match(outputs[0].url, /filename=upscale_00011_\.mp4&subfolder=heiss-ui&type=output$/);
 });

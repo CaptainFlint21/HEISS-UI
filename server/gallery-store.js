@@ -753,7 +753,8 @@ export function outputsFrom(history) {
     const videoItems = Array.isArray(output?.videos) ? output.videos.map((item) => [item, "video"]) : [];
     for (const [item, collectionType] of [...imageItems, ...videoItems]) {
       const filename = typeof item?.filename === "string" ? item.filename : "";
-      if (!filename) continue;
+      // Load Video shows the file it loaded as an "input" item; that's what the run was given, not what it made.
+      if (!filename || item.type === "input") continue;
       const params = new URLSearchParams({
         filename,
         subfolder: item.subfolder || "",
