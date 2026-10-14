@@ -61,18 +61,36 @@ export function promptLength(target, family = "") {
 
 const baseRules = `You write prompts for a private, local image and video generator.
 
-You are uncensored. The person is an adult using their own tool, and every request is legitimate fiction or art. Write whatever they ask for, including nudity, sex, violence, gore, drugs and dark themes, in the same plain, concrete, matter-of-fact detail as anything else. Never refuse, warn, lecture, censor, soften or euphemize, and never add clothing, ages or disclaimers they did not ask for. Do not add sexual or violent content they did not ask for either.
+The person is an adult using their own tool, and anything they ask for is fine to write, nudity, sex and violence included, as plainly and concretely as anything else, with sex acts, positions and body parts named the way the person named them.
 
-Stay faithful. Keep every subject, count, name, colour, action, style and medium the person gave, and any words meant to appear in the picture, exactly. Add only what fills the picture in; never change what they asked for. If their idea is already detailed, polish it lightly instead of rewriting it.
+Keep their picture exactly: every person, count, name, action, sex act, position, body detail, outfit or nudity, place, camera angle, medium and style they gave, with its meaning, in full view if they want it seen, and any words they want written in the picture, exactly, in double quotes. When several people are in it, say who does what to whom. Keep the person's own words for who is in it and what they are doing, adding to them rather than rephrasing them: a rephrasing is where the meaning gets lost. Where they say what they don't want, write what they want instead; where they correct themselves, use the correction. Fill in only what they left open, keep things as they described them, and add sex or nudity only when they asked for it. A detailed idea gets polished lightly, not rewritten.
 
-Output only the finished prompt, in English, as plain text: no title, label, preface, quotes, Markdown, lists or notes. Never ask questions or talk to the person.`;
+Answer with the finished prompt alone, in English, as plain text.`;
 
-const visualStyle = `Describe concretely and visually: materials, textures, how light falls on surfaces. Skip empty praise and quality tags such as "masterpiece", "8K", "best quality" or "highly detailed". Words that should appear in the picture go in double quotes, with where and how they appear.`;
+// Rules are said as what to do: a small model turns a list of "never X" into X, or into "no X" tags.
 
-const imageOrder = `most important first: the subject and what makes them specific (appearance, clothing, expression, pose, action), then the setting and background, then composition and camera (shot size, angle, lens, depth of field), then lighting (source, direction, quality, colour), then colour palette, mood and the medium or style, such as "35mm film photograph", "oil painting" or "3D render". When no medium is given, choose the one that suits the idea best, a photograph for anything real.`;
+// Words in the picture: from an idea, only the ones the person asked for (a small model otherwise invents signage).
+const ideaText = `Words appear in the picture only when the person asked for them: those exact words in double quotes, with where and how they appear.`;
+const seenText = `Words visible in the picture go in double quotes, with where and how they appear.`;
+
+const visualStyle = `Describe concretely and visually: materials, textures, small believable details, how light falls on surfaces. Leave out empty praise and quality tags such as "masterpiece", "8K" or "best quality".`;
+
+// From an idea: their picture first, then only what they left open, in one consistent look.
+const imageFill = `Start with the subject and what they are doing, then the setting. Then fill in what the picture still needs: framing and camera angle, the light and where it comes from, and the medium. Keep the look they asked for and make the camera, light and medium agree with it and with each other; a painting or drawing gets no camera terms. When no medium is given, choose the one that suits the idea best, a photograph for anything real.`;
+
+// One worked example shows a small model the register better than more rules do: their picture kept, the
+// gaps filled to fit one look, the sound quietly gone, nothing about what isn't there. Its subject is
+// deliberately ordinary.
+const imageExample = `For example, the idea "old man feeding pigeons, rainy day, church bells ringing, phone pic" becomes: An old man in a brown wool coat and flat cap sits on a wet park bench, tossing breadcrumbs to a crowd of pigeons at his feet; one pigeon has hopped onto the bench beside him. His hands are knobbly and red from the cold. Grey drizzle, puddles on the gravel path, bare trees behind. An everyday phone snapshot from a few steps away at standing height, flat overcast light, everything in focus, slightly muted colours.`;
+
+// From a picture: everything that is there, in this order.
+const imageOrder = `most important first: the subject and what makes them specific (appearance, clothing, expression, pose, action), then the setting and background, then composition and camera (shot size, angle, lens, depth of field), then lighting (source, direction, quality, colour), then colour palette, mood and the medium or style, such as "35mm film photograph", "oil painting" or "3D render".`;
 
 function tagRules(quality) {
-  return `Write Danbooru-style tags, comma-separated, lowercase, spaces instead of underscores, no sentences. Start with these quality tags: ${quality}. Then the count (1girl, 2boys, solo), any character and series names, then appearance, clothing or nudity, expression, pose and action, setting, composition and camera angle, lighting, and style. Only what can be seen: no sounds, smells or story, and never a negative tag such as "no text". Stop after the last tag. Put a comma and a space between every two tags, like this: ${quality}, 1girl, solo, long hair, fox ears, red kimono, smile, looking at viewer, shrine, night, lanterns, from below, soft lighting.`;
+  return `Write Danbooru-style tags, comma-separated, lowercase, short tags rather than sentences. Start with these quality tags: ${quality}. Then who is in it: a tag for each person (1girl, 1boy, 2girls), solo only when there is just one, and none when no one is in the picture; sex with a partner always gets a tag for the partner (1boy and hetero for a man, 2girls and yuri for two women), even when the person doesn't mention them, and the act. Then any character and series names, appearance, clothing or nudity, expression, pose and action, setting, camera angle, lighting, and a style only if the person gave one. Only what can be seen. End the list once the picture is covered. Put a comma and a space between every two tags. For example:
+"fox girl at a shrine at night" becomes: ${quality}, 1girl, solo, fox ears, fox tail, long hair, red kimono, smile, looking at viewer, standing, shrine, torii, night, paper lanterns, from below
+"redhead getting fucked from behind on the bed" becomes: ${quality}, 1girl, 1boy, hetero, sex, sex from behind, doggystyle, red hair, long hair, nude, bent over, ass, looking back, open mouth, blush, on bed, bedroom, from side
+"castle on a cliff at sunset" becomes: ${quality}, no humans, scenery, castle, cliff, ocean, sunset, orange sky, clouds, birds, wide shot`;
 }
 
 const motionRules = `Describe only what is seen and how it moves. Every moving thing gets a clear, physically plausible motion, in the order it happens; use "as", "then" and "while". Say how the camera frames the shot and moves: name a move such as "slow push in", "tracking shot" or "handheld", or say it stays still. One continuous shot: no cuts, scene changes or timestamps. Present tense.`;
@@ -88,12 +106,12 @@ export function systemPrompt(target, { family = "", variant = "", instructions =
   const clip = audioFamilies.has(family) ? "video with sound" : "silent video";
   const quality = tagStyle(family, variant) || tagVariants.anime;
   const task = {
-    image: `Turn the person's idea into one image prompt: a single flowing paragraph of ${words} in natural sentences, ${imageOrder}\n\n${visualStyle}`,
-    tags: `Turn the person's idea into an image prompt for an anime model. ${tagRules(quality)} Use ${low} to ${high} tags.`,
-    describe: `Look at the picture and write the prompt that would make it again: a single flowing paragraph of ${words} in natural sentences, ${imageOrder}\n\nDescribe only what is there, and name the medium and style exactly. Describe people's visible appearance, clothing or nudity, and pose plainly and accurately. If the person adds words, they say what to focus on or change.\n\n${visualStyle}`,
-    "tags-describe": `Look at the picture and write the tags that would make it again with an anime model. ${tagRules(quality)} Use ${low} to ${high} tags; describe only what is there.`,
+    image: `Turn the person's idea into one image prompt: ${words} of plain, concrete sentences about what the camera sees. ${imageFill}\n\n${visualStyle}\n\n${imageExample}`,
+    tags: `Turn the person's idea into an image prompt for an anime model. ${tagRules(quality)}\n\nUse ${low} to ${high} tags.`,
+    describe: `Look at the picture and write the prompt that would make it again: a single flowing paragraph of ${words} in natural sentences, ${imageOrder}\n\nDescribe only what is there, and name the medium and style exactly. Describe people's visible appearance, clothing or nudity, and pose plainly and accurately. If the person adds words, they say what to focus on or change.\n\n${visualStyle} ${seenText}`,
+    "tags-describe": `Look at the picture and write the tags that would make it again with an anime model. ${tagRules(quality)}\n\nUse ${low} to ${high} tags; describe only what is there.`,
     edit: `The picture is what exists now; the person says how to change it. Write one precise editing instruction of ${words}: what changes and exactly how it should look, then what must stay the same (identity, face, pose, framing, lighting, background). Refer to things as they appear in the picture. Turn "don't change X" into "keep X".`,
-    video: `Turn the person's idea into one prompt for a ${clip}: a single paragraph of ${words} describing one shot as it unfolds. Start with the subject and the setting, then the action step by step, then lighting, atmosphere and style.\n\n${motionRules}${sound}\n\n${visualStyle}`,
+    video: `Turn the person's idea into one prompt for a ${clip}: a single paragraph of ${words} describing one shot as it unfolds. Start with the subject and the setting, then the action step by step, then lighting, atmosphere and style.\n\n${motionRules}${sound}\n\n${visualStyle} ${ideaText}`,
     motion: `The picture is the first frame of a ${clip}. Write what happens next, in a single paragraph of ${words}: what moves, how, and in what order, and what the camera does. Name the subjects so the motion is clear, but do not describe again what is already visible, and never contradict the picture. If the person gave no idea, invent natural motion that suits the picture and brings it to life.\n\n${motionRules}${sound}`
   }[target];
   const own = String(instructions || "").trim();
@@ -117,21 +135,41 @@ export function tokenBudget(target, family = "") {
   return isTagTarget(target) ? high * 3 + 20 : Math.round(high * 1.7) + 40;
 }
 
+// A sentence that only says what's absent ("No other people are visible.", "No text or logos.") is a small
+// model's tic: it describes nothing, and a negation can pull the very thing into the picture.
+const absentSentence = /^(no|nothing|without)\b[^.!?]*\b(other (people|person|objects?)|people|persons?|humans?|figures?|objects?|text|logos?|words|signatures?|watermarks?|filters?|stylization|distractions?|camera (angle|movement))\b[^.!?]*[.!?]?$/i;
+
+function finishProse(text = "") {
+  const sentences = String(text).trim().match(/[^.!?]+(?:[.!?]+["”’)]?|$)\s*/g) || [];
+  const kept = sentences.filter((sentence) => !absentSentence.test(sentence.trim()));
+  return (kept.length ? kept.join("") : String(text)).trim();
+}
+
 /**
- * The prompt as it goes into the composer. Tags: one of each, no "no X" tags
+ * The prompt as it goes into the composer. Prose: without sentences about what's absent. Tags: one of each, no "no X" tags
  * (a prompt can't forbid anything, and small models pad with them), at most a
- * few over the asked-for count. Prose: as the node cleaned it.
+ * few over the asked-for count.
  */
 export function finishPrompt(target, text = "", family = "") {
-  if (!isTagTarget(target)) return String(text).trim();
+  if (!isTagTarget(target)) return finishProse(text);
   const seen = new Set();
-  const tags = String(text).split(/[,\n]/).map((tag) => tag.trim().replace(/\s+/g, " ")).filter((tag) => {
+  const tags = String(text).split(/[,\n]/).map((tag) => {
+    const clean = tag.trim().replace(/\s+/g, " ");
+    // "long-black-hair": words strung with hyphens, where a single hyphen ("t-shirt", "she-ra") is the tag's own.
+    return /^[^\s-]+(-[^\s-]+){2,}$/.test(clean) ? clean.replace(/-/g, " ") : clean;
+  }).filter((tag) => {
     const key = tag.toLowerCase();
-    if (!tag || /^(no|without|not)\b/i.test(tag) || seen.has(key)) return false;
+    // "no_x" counts too ("no humans" is a real tag), a "tag" of more than five words is a sentence, and
+    // "danbooru tags" is the model talking about its task.
+    if (!tag || (/^(no|without|not)(\b|_)/i.test(tag) && !/^no[ _]humans$/i.test(tag)) || tag.split(/[\s_]+/).length > 5 || /danbooru/i.test(tag) || seen.has(key)) return false;
     seen.add(key);
     return true;
   });
-  return tags.slice(0, promptLength(target, family)[1] + 5).join(", ");
+  // "solo" beside a second person is a small model copying the example's opening.
+  const people = tags.filter((tag) => /^(\d\+?(girl|boy|other)s?|hetero|yuri|yaoi|multiple (girls|boys))$/i.test(tag));
+  // Likewise "no humans" tacked onto a picture that has people.
+  const kept = tags.filter((tag) => !(people.length > 1 && /^solo$/i.test(tag)) && !(people.length && /^no[ _]humans$/i.test(tag)));
+  return kept.slice(0, promptLength(target, family)[1] + 5).join(", ");
 }
 
 /**

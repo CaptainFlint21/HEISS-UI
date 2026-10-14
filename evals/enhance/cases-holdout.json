@@ -1,0 +1,39 @@
+{
+  "about": "Held-out base prompts: never tuned against, only run to check a change generalises (run.mjs --file cases-holdout.json). Same shape vocabulary as cases.json. Every character is an adult.",
+  "families": {
+    "krea2": { "label": "Krea 2", "family": "krea2", "variant": "turbo", "reference": "Krea 2" },
+    "sdxl": { "label": "SDXL 1.0", "family": "sdxl", "variant": "standard", "reference": "SDXL 1.0" },
+    "pony": { "label": "Pony", "family": "sdxl", "variant": "pony", "reference": "Pony" },
+    "flux1": { "label": "Flux.1 Dev", "family": "flux1", "variant": "dev", "reference": "Flux.1 D" },
+    "qwen21": { "label": "Qwen-Image 2.1", "family": "qwen_image_21", "variant": "standard", "reference": "Qwen 2.1" }
+  },
+  "shared": [
+    { "id": "h-dog-surf", "nsfw": false, "shape": "tiny", "prompt": "corgi surfing a wave" },
+    { "id": "h-gym-mirror", "nsfw": true, "shape": "one", "prompt": "muscular redhead taking a gym mirror selfie with her sports bra pulled up and her tits out, sweaty" },
+    { "id": "h-threesome", "nsfw": true, "shape": "two", "prompt": "two guys spitroasting a blonde on a couch, one in her mouth one fucking her from behind. living room, tv on, amateur video still" },
+    { "id": "h-wedding", "nsfw": false, "shape": "ramble", "prompt": "i need a wedding photo but not cheesy, like the couple is laughing and its raining and they didnt care, shes holding her dress up out of the mud and hes got his jacket over her head, uh small village church in the back, black and white maybe? no actually color but muted, kind of like those documentary wedding photographers" },
+    { "id": "h-sauna", "nsfw": true, "shape": "ramble", "prompt": "ok so finnish sauna, wooden benches, steam everywhere, theres this older woman like 40s with grey streaks in her hair and big saggy tits sitting with her legs open and her pussy showing, shes totally relaxed not posing, a towel next to her not on her, and through the little window you see snow outside, and the light is that warm low light, real photo not fake looking" }
+  ],
+  "own": {
+    "krea2": [
+      { "id": "h-tattoo-artist", "nsfw": false, "shape": "two", "prompt": "Tattoo artist with a shaved head working on a client's forearm. Close up on the needle and the ink, studio lamp light." },
+      { "id": "h-car-backseat", "nsfw": true, "shape": "one", "prompt": "brunette giving a handjob in the back seat of a car at night, dashboard glow, his cock in her fist, shot on phone" }
+    ],
+    "sdxl": [
+      { "id": "h-cyber-samurai", "nsfw": false, "shape": "one", "prompt": "cyberpunk samurai standing in neon rain, katana glowing" },
+      { "id": "h-pool-float", "nsfw": true, "shape": "tiny", "prompt": "nude pool float tan lines" }
+    ],
+    "pony": [
+      { "id": "h-succubus", "nsfw": true, "shape": "one", "prompt": "succubus riding a guy cowgirl in a dungeon, wings spread, tail wrapped around his leg, cum overflowing" },
+      { "id": "h-library-elf", "nsfw": false, "shape": "two", "prompt": "Elf librarian on a ladder reaching for a book. Huge old library, dust in the light." }
+    ],
+    "flux1": [
+      { "id": "h-noir", "nsfw": false, "shape": "tiny", "prompt": "film noir detective office" },
+      { "id": "h-boudoir", "nsfw": true, "shape": "two", "prompt": "Boudoir photo of a curvy woman in a sheer black robe, open in the front so you see her pussy and tits. Window light, white sheets, very soft." }
+    ],
+    "qwen21": [
+      { "id": "h-bakery-chalk", "nsfw": false, "shape": "two", "prompt": "Bakery window with a chalkboard that says \"Fresh Croissants 2€\". Morning, a cyclist passing by reflected in the glass." },
+      { "id": "h-locker-room", "nsfw": true, "shape": "one", "prompt": "volleyball player getting fingered by her teammate on the locker room bench, both naked, wet hair after the shower" }
+    ]
+  }
+}

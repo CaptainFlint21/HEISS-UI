@@ -22,7 +22,7 @@ const args = {};
 process.argv.slice(2).forEach((arg, i, all) => { if (arg.startsWith("--")) args[arg.slice(2)] = all[i + 1]?.startsWith("--") ? "1" : all[i + 1] ?? "1"; });
 const list = (value) => (value ? value.split(",") : null);
 
-const cases = JSON.parse(fs.readFileSync(path.join(here, "cases.json"), "utf8"));
+const cases = JSON.parse(fs.readFileSync(path.join(here, args.file || "cases.json"), "utf8"));
 const families = list(args.families) || Object.keys(cases.families);
 const only = list(args.cases);
 const settings = { ...enhanceDefaults, creativity: args.creativity ? Number(args.creativity) : enhanceDefaults.creativity };
@@ -61,7 +61,7 @@ for (const [index, { key, item, take }] of jobs.entries()) {
   }
   const output = finishPrompt(plan.target, raw, fam.family);
   const run = {
-    family: key, case: item.id, take, nsfw: item.nsfw, shape: item.shape, target: plan.target, base: item.prompt, output, error,
+    family: key, case: item.id, take, nsfw: item.nsfw, shape: item.shape, target: plan.target, base: item.prompt, output, raw: raw !== output ? raw : undefined, error,
     words: output.split(/\s+/).filter(Boolean).length,
     telemetry: {
       model, seed, temperature: plan.temperature, maxTokens: plan.maxTokens, systemChars: plan.system.length,
