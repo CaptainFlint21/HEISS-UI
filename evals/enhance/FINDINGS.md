@@ -1,5 +1,21 @@
 # Findings
 
+## Round 3: NSFW understanding (2026-10-14)
+
+**The act probe** (`cases.acts.json`, 12 common acts × 2 takes on Krea, results/acts-v8) showed a knowledge gap, not a wording problem. Only mating press, footjob and the POV blowjob came out right. "Missionary" became a religious missionary in a long-sleeved dress; "spitroasting" became two men with barbecue torches; 69 became plain intercourse; facesitting became her face in his lap; titfuck, him gripping her hips from behind; a handjob, with the giver and receiver swapped.
+
+**The fix: a terms table, looked up per idea** (`server/prompt-terms.js`). About 50 entries, each a term, its plain physical meaning (who is where doing what to whom) and its Danbooru tags. Only the entries an idea actually uses go into that one request's system prompt, so SFW prompts get nothing and the table can grow for free. Everyday words (a cowgirl on a horse, a missionary in a village, a spa facial, a doggy bed, route 69) only count when the idea is sexual anyway; all of those traps stay clean (unit-tested). Acts that take a man (missionary, cowgirl position, paizuri…) add 1boy to tags. The parts involved in sex are bare, with clothes pulled aside, up or down, said both in the base rules and in the notes.
+
+**Results**
+- **Tuned probe** (results/acts-terms): 69, facesitting, spitroast, doggystyle, cowgirl, mating press, missionary (face to face, from the front) and titfuck are right; the remaining slips are occasional.
+- **Held-out probe** (`cases.acts2.json`, new wording and scenes, never tuned on; results/acts2): eating out, a handjob under a restaurant table, prone bone, scissoring, pegging, facial and DP are right on Krea, Qwen and Pony. The car handjob, wrong in every take before, is right in both prose families.
+- **Solo probe** (`cases.solo.json`, results/solo): fingering herself, masturbating in a bathtub, riding a dildo (upright beneath her), a wand on her clit, spreading, presenting, grabbing her own tits, flashing, all right in all three families; Pony tags `solo, female masturbation`, `dildo riding`, `spread pussy`, `grabbing own breast`. Partnered fingering stays partnered ("his hand… fingers inside her"; `1girl, 1boy, hetero`).
+- **Isolation:** on the main eval, every prose prompt without a sex term came out byte-identical to before (same seeds).
+- **Clothing in sex scenes:** 13 of 16 takes now have it pulled aside, up or down, or absent (was: tank top and jeans during DP).
+- **The Pony sex example,** cut to `1girl, 1boy, hetero, sex, sex from behind, red hair, nude, on bed`, stopped leaking "bent over, looking back" into unrelated positions.
+
+**Still wrong:** a handjob with no man named in the idea ("girl giving a handjob in a cinema") still gives her the cock; DP sometimes keeps jeans on; reverse cowgirl sometimes starts "lies on her back".
+
 ## Round 2 (2026-10-14)
 
 - **Already-good prompts in** (Civitai Krea #13, Qwen #12, Flux #5 used as input; results/refs-in): they come back nearly verbatim, tidied, every detail kept. The Flux one's Markdown sheet became clean prose with all its placements. The only additions were the habitual "shallow depth of field, no filters" on phone shots.

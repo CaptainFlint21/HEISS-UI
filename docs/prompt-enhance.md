@@ -23,6 +23,7 @@ How the system prompt is written follows what a 4B model actually does with it (
 - **The person's picture comes first and stays theirs:** who does what to whom, in their own words; then only the gaps are filled, in one consistent look. A list of every slot to fill made every prompt the same ("low angle, shallow depth of field, 35mm film").
 - **Rules say what to do.** A small model turns "never X" into X, or into `no_x` tags, so the system prompt has no lists of what to avoid.
 - **One worked example per task** carries the register better than more rules.
+- **Sex terms are looked up, not guessed** (`server/prompt-terms.js`). A 4B model knows the words but not the positions ("missionary" came back as a missionary in a long dress). The terms an idea uses, and only those, go into its system prompt with their plain meaning and Danbooru tags. Everyday senses (a cowgirl on a horse, a spa facial) only count in a sexual idea.
 - **`finishPrompt` cleans up what the model still does:** negative and sentence-length tags, "solo" beside a second person, prose sentences that only say what's absent.
 
 `evals/enhance` runs base prompts through this exact code (`enhancePlan` → `runEnhance` → `finishPrompt`) with timing for each run, for reading against reference prompts.
