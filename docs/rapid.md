@@ -252,6 +252,9 @@ Measured on the RTX 3070 (8 GB), seed 42, portrait and text prompts. Sampling ti
 | Krea 2 Turbo | 1536² | 56.5s | 31.4s at 0.45 (35.5s at 0.7) | – |
 | Flux.2 Klein 9B (4 steps) | 1024² / 1536² | 7.9s / 16.4s | 6.3s / 11.2s | – |
 | Z-Image Turbo (8 steps) | 1024² | 13.4s | 10.1s | skips 0-2 of 8 |
+| Qwen-Image 2.1, shipped (0.3 from 0.5) | 1024² | 17.1s | – | 12.7s (1.35×), as off |
+| Krea 2 Edit merge int4 (8 steps) | 1024² | 8.7s | 5.4s at 0.45 (1.62×), tighter framing, text as its off | – |
+| Pony (SDXL, 25 steps, euler_ancestral, CFG 7) | 1024² | 12.0s | 9.3s (1.29×) | skips none |
 | Z-Image Turbo | 1536² | 28.0s | 18.8s (1.49×), text and skin hold; 0.45 at 1024² broke the chalkboard layout, so it keeps 0.7 | – |
 | Pony (SDXL, 25 steps, CFG 5, euler) | 1024² | 11.8s | – | 6.7s, but text smears |
 
@@ -264,6 +267,6 @@ What the pictures showed:
 - **Krea 2 Turbo at 0.45** looks as at 0.7, text included. Its chalkboard is garbled with and without Rapid.
 - **Rejected**: a 0.375 start size (Krea text breaks), and one full-size step instead of two on Klein (1.97×, but softer, fewer raindrops and "BAKERRY"; a candidate for Faster only).
 
-**The grow with the run's own noise** (node pack `feature/rapid-v2`, 19d066f, PACK_VERSION 9, not pushed yet): at the switch the new high frequencies come from the noise the seed drew, not from a fresh draw. Same speed. At 1024² it keeps Rapid pictures closer to off: Krea 2 Turbo's portrait gets its raindrops back, and Flux.2 Klein's chalkboard reads "Croisant 2.50 / Coffee 1.80 / Pretzel 1.20" where the fresh draw gave duplicated, jumbled rows. Once pushed, `node-packs.js` pins that commit.
+**The grow with the run's own noise** (node pack `feature/rapid-v2`, 19d066f, PACK_VERSION 9, not pushed yet): at the switch the new high frequencies come from the noise the seed drew, not from a fresh draw. Same speed. At 1024² it keeps Rapid pictures closer to off: Krea 2 Turbo's portrait gets its raindrops back, and Flux.2 Klein's chalkboard reads "Croisant 2.50 / Coffee 1.80 / Pretzel 1.20" where the fresh draw gave duplicated, jumbled rows. Once pushed, `node-packs.js` pins that commit. At 1536² it is neutral to better (Krea the same; Klein's sign reads "EST 1987" where the fresh draw squashed it), and on the Krea 2 Edit int4 merge and Pony it changes nothing visible.
 
 Still to measure: step reuse on the long-step families with CFG (Krea 2 Raw, Z-Image Base, Qwen-Image, Flux.2 Dev, Flux.1, Chroma), where it may beat the half-size start; none of those were on this machine.
