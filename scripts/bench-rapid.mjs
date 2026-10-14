@@ -282,7 +282,7 @@ for (const profile of chosen) {
     continue;
   }
   // A model without Rapid would just rerun the same graph, which ComfyUI answers from its cache in 0.01 s.
-  const profileModes = modes.filter((mode) => (!mode.rapid || profile.capabilities?.rapid) && (!mode.rapidGuidance || (profile.capabilities?.rapidGuidance && Number(profile.defaults?.cfg) > 1)));
+  const profileModes = modes.filter((mode) => (!mode.rapid || profile.capabilities?.rapid) && (!mode.rapidGuidance || (profile.capabilities?.rapidGuidance && Number(opts.cfg ?? profile.defaults?.cfg) > 1)));
   if (profileModes.length < modes.length) console.log("  no Rapid for this model: only the off runs");
   for (const [width, height] of sizes) {
     for (const promptId of promptIds) {
