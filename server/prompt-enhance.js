@@ -120,7 +120,10 @@ const soundRules = `Weave the sound in alongside the action, not at the end: amb
  */
 const openChoices = {
   framing: ["a close-up", "a medium shot from the waist up", "a full-length shot", "a wide shot that shows the surroundings", "a high angle looking down", "a low angle looking up", "a candid side view", "an over-the-shoulder view"],
-  light: ["soft window light", "golden-hour sun", "flat overcast daylight", "hard midday sun", "a single warm lamp", "neon and street light", "blue-hour dusk light", "direct on-camera flash", "candlelight", "soft studio light"]
+  light: ["soft window light", "golden-hour sun", "flat overcast daylight", "hard midday sun", "a single warm lamp", "neon and street light", "blue-hour dusk light", "direct on-camera flash", "candlelight", "soft studio light"],
+  // For a person the idea doesn't describe: the model's default was long dark hair and a neutral face, every time.
+  hair: ["short curly hair", "a sleek red bob", "long blonde waves", "black braids", "a buzz cut", "silver hair pinned up", "auburn hair in a loose ponytail", "messy brown bangs", "shoulder-length black hair", "a platinum pixie cut"],
+  expression: ["laughing", "a sly half-smile", "looking away, lost in thought", "a serious, direct stare", "eyes closed", "mid-sentence, mouth slightly open", "a shy smile", "a raised eyebrow"]
 };
 
 /** A choice from `list` for this roll; `salt` keeps the picks for different lists independent. */
@@ -132,7 +135,7 @@ export function rolled(list, roll = 0, salt = 0) {
 }
 
 // Only for a short idea: a detailed prompt already chose its framing and light, or meant to leave them.
-const rollFor = (text, roll) => (wordCount(text) > 40 ? "" : `Where the idea leaves them open, this time use ${rolled(openChoices.framing, roll, 1)} and ${rolled(openChoices.light, roll, 2)}.`);
+const rollFor = (text, roll) => (wordCount(text) > 40 ? "" : `Where the idea leaves them open, this time use ${rolled(openChoices.framing, roll, 1)} and ${rolled(openChoices.light, roll, 2)}; a person it doesn't describe has ${rolled(openChoices.hair, roll, 3)} and ${rolled(openChoices.expression, roll, 4)}.`);
 
 /** The system prompt for one target, family, the idea (for the sex terms it uses), the roll for what it leaves open, and the person's own standing instructions. */
 export function systemPrompt(target, { family = "", variant = "", instructions = "", text = "", roll = 0 } = {}) {
@@ -187,6 +190,7 @@ const hedges = [/\s*[—–-]+\s*if any\s*[—–-]+\s*/gi, /,?\s*\bif any\b/gi,
 const phraseEnd = String.raw`(?=[,.;:!?]| and | while | as |$)`;
 const eitherOr = [
   [/\b(\w+ing) or \w+ing\b/g, "$1"],
+  [new RegExp(String.raw`\b(eyes (?:\w+ )?)([\w-]+) or [\w-]+\b${phraseEnd}`, "gi"), "$1$2"],
   [new RegExp(String.raw`\b(on|onto|against|around|over|across|near|beside|under) ((?:the |her |his |their )?[\w-]+) or (?:the |her |his |their )?[\w-]+\b${phraseEnd}`, "gi"), "$1 $2"],
   [new RegExp(String.raw`\b(her|his|their) ([\w-]+) or (?:her |his |their )?[\w-]+\b${phraseEnd}`, "gi"), "$1 $2"]
 ];
