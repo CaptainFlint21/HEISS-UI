@@ -1,5 +1,58 @@
 # Findings
 
+## Round 1: v1–v8 (2026-10-14)
+
+Targeted runs on the cases each change touched (results/v1 … v8, fid-*, v6-holdout, v7-holdout, video-check, model-*), then a full re-run (results/v8-full) against the baseline. Held-out prompts (`cases-holdout.json`) were never tuned on; they only checked that a change generalises, and it did.
+
+### What changed, and why
+
+1. **Their picture first, then only the gaps.** The baseline's slot list (shot, angle, lens, depth of field, light, palette, mood, medium) made a 4B model fill every slot with the same defaults. The image task now starts with the subject and the action, then fills in only what the picture still needs, in one consistent look ("make the camera, light and medium agree"; a painting or drawing gets no camera terms).
+2. **Rules said as what to do.** Every negated list in the system prompt came back. "Never add ages, drugs, violence…" and "no sounds, smells…" turned into `no_age, no_drugs, no_sound` tags on Pony and "No text or logos" sentences in prose. Naming smells, even to forbid them, produced "the air smells of cinnamon". The rules are now short and positive; the system prompt contains no "never".
+3. **Who does what to whom, in their own words.** "Keep the person's own words for who is in it and what they are doing": rephrasing is where "pushing her head into the mattress" became "his head is buried in the mattress".
+4. **One worked example per task.** A prose example (an ordinary scene, a sound in the idea quietly dropped, a coherent phone-photo look) and three tag examples (one person, a couple having sex, no people) did more than any rule. They fixed "1girl, solo" on everything, the missing 1boy, and "no humans" for scenery. The sex example is the main Pony use case per the references; SFW Pony prompts (held-out librarian elf, surfing corgi) stayed clean.
+5. **Words in the picture only when asked**, inside the keep-list rather than as their own rule, which was producing invented signage and "No text" lines.
+6. **Deterministic cleanup** in `finishPrompt`. Tags: `no_x` / `no-x` tags (keeping "no humans"), tags of more than five words, "danbooru tags", "solo" beside a second person, "no humans" beside people, and hyphen-strung tags. Prose: sentences that only say what's absent ("No other people are visible.") go, while sentences that mean something ("No clothing on her.") stay.
+
+### Full re-run against the baseline (60 runs each)
+
+| | baseline | v8 |
+|---|---|---|
+| "shallow depth of field" (48 prose) | 46 | 13 |
+| "35mm film" | 22 | 0 |
+| "low angle" | 29 | 15 |
+| "Color palette:" label | 16 | 0 |
+| Pony partnered scenes with 1boy (of 5) | 0 | 4 |
+| Pony partnered scenes with "solo" (of 5) | 4 | 2 |
+| Pony with no_x tags | 2 | 0 |
+| hit the token cap | 7 | 1 |
+| median prose words | 146 | 119 |
+| median time per prompt | 4.3 s | 4.0 s |
+
+By eye: topless, missionary (mostly), "a man fucking her" and the person's crude wording now survive; the look is coherent (Kodak Gold becomes grain and low contrast; a graphic-novel style gets no lens); text appears exactly where asked ("How Espresso Works" as five labelled panels) and is no longer invented.
+
+### Tried and dropped
+
+- **Temperature.** At 0.5 and 0.7 (3 takes each) the same cases fail the same way, so the misreads are systematic, not sampling noise. The 0.7 default stays.
+- **A phone-photo rule** ("sharp throughout, lit by the flash") was copied verbatim into prompts that never asked for a phone.
+- **Splitting tags to one-to-three words** broke phrases into single words ("skirt, pulled, up").
+- **Spelling out what to leave out** (sounds, music, smells), three wordings: each primed the thing it named.
+
+### Known limits of the 4B model (not patched, to avoid tuning to the eval)
+
+- Some act vocabulary: "giving a handjob… his cock in her fist" gives the woman the cock; "spitroasting" becomes spitting; "missionary with legs up by her head" sometimes becomes "from behind".
+- A sound the person mentions still comes through about half the time (the party ramble), and storms get thunder.
+- Decay it adds by habit: the cooling pie is "half-baked", the kitchen grimy.
+- Filler such as "no filters or stylization, just raw detail".
+
+### The other enhancer models
+
+- **Qwen3.5 4B (HauhauCS uncensored fine-tune):** reads act vocabulary better (handjob, missionary, the whole pie), never refused, and on this PC ran at 25–37 tok/s (the 6 tok/s in the docs was measured with less VRAM free). But it copies examples (the Pony office scene came back as the doggystyle example word for word), and its first words take 2.7 s against 1.5 s. Qwen3-VL 4B stays the default.
+- **Qwen3.5 2B:** the fastest (50–65 tok/s) and clearly weaker: it invents subjects (a grandma in the empty kitchen) and dresses nude scenes.
+
+### Video (out of scope, checked so nothing broke)
+
+LTX-2 still weaves in sound and speech, and Wan stays silent. Two old flaws remain: LTX invents dialogue nobody asked for, and on silent Wan a spoken line ("come here") becomes on-screen text.
+
 ## Baseline (2026-10-14, results/baseline)
 
 Qwen3-VL 4B, creativity 0.7, the prompts in `server/prompt-enhance.js` as merged in PR #12. 60 runs, 12 per family.

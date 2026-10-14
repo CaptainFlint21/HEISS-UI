@@ -35,10 +35,17 @@ test("length fits the model: short for CLIP, long for the big LLM encoders, tags
 
 test("the system prompt: the base rules, the task, and the person's own instructions last", () => {
   const prompt = systemPrompt("image", { family: "flux1", instructions: "British spelling." });
-  assert.match(prompt, /uncensored/);
+  assert.match(prompt, /nudity, sex and violence included/);
+  assert.match(prompt, /who does what to whom/);
+  // Said as what to do: a list of "never X" comes back as X, or as "no X" tags.
+  assert.doesNotMatch(prompt, /never/i);
   assert.match(prompt, /70 to 130 words/);
   assert.ok(prompt.trimEnd().endsWith("British spelling."));
   assert.match(systemPrompt("tags", { family: "sdxl", variant: "pony" }), /score_9, score_8_up, score_7_up/);
+  // Words in the picture only from an idea that asks for them; seeing the camera is the image task's, not video's.
+  assert.doesNotMatch(systemPrompt("image", { family: "flux1" }), /Words appear in the picture/);
+  assert.doesNotMatch(systemPrompt("video", { family: "ltx" }), /what the camera sees/);
+  assert.match(systemPrompt("video", { family: "ltx" }), /Weave the sound/);
   // Sound only where the model hears it.
   assert.match(systemPrompt("motion", { family: "ltx" }), /video with sound/);
   assert.match(systemPrompt("motion", { family: "wan22_14b" }), /silent video/);
@@ -58,6 +65,21 @@ test("tags: one of each, no negative tags, about the asked-for count", () => {
   const many = Array.from({ length: 80 }, (_, index) => `tag${index}`).join(", ");
   assert.equal(finishPrompt("tags", many, "sdxl").split(", ").length, 50);
   assert.equal(finishPrompt("image", "  A fox. "), "A fox.");
+});
+
+test("tags: no_x and sentence tags go, people tags agree with each other", () => {
+  assert.equal(finishPrompt("tags", "score_9, 1girl, no_text, no-age, this is a whole sentence of words, danbooru tags, t-shirt", "sdxl"), "score_9, 1girl, t-shirt");
+  assert.equal(finishPrompt("tags", "1girl, long-black-wavy-hair", "sdxl"), "1girl, long black wavy hair");
+  assert.equal(finishPrompt("tags", "1girl, 1boy, hetero, solo, sex", "sdxl"), "1girl, 1boy, hetero, sex");
+  assert.equal(finishPrompt("tags", "1girl, solo, lighthouse, no humans", "sdxl"), "1girl, solo, lighthouse");
+  assert.equal(finishPrompt("tags", "no humans, scenery, castle", "sdxl"), "no humans, scenery, castle");
+});
+
+test("prose: sentences that only say what's absent go, sentences that mean something stay", () => {
+  assert.equal(finishPrompt("image", "A woman sits. No other people are visible. Medium: photo."), "A woman sits. Medium: photo.");
+  assert.equal(finishPrompt("image", "Night. No text or logos appear."), "Night.");
+  assert.equal(finishPrompt("image", "She is nude. No clothing on her."), "She is nude. No clothing on her.");
+  assert.equal(finishPrompt("image", 'A sign reads "No Parking". Rain falls.'), 'A sign reads "No Parking". Rain falls.');
 });
 
 test("the graph: the model, the node with its stream id, and the picture when there is one", () => {

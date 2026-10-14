@@ -5,7 +5,7 @@
 // (base and enhanced side by side, for reading).
 //
 //   node evals/enhance/run.mjs [--name baseline] [--families krea2,pony] [--cases office,motel]
-//                              [--repeat 2] [--model <file>] [--creativity 0.7] [--seed random]
+//                              [--kind video] [--repeat 2] [--model <file>] [--creativity 0.7] [--seed random]
 import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -43,7 +43,7 @@ console.log(`${jobs.length} runs · ${model} · creativity ${settings.creativity
 
 for (const [index, { key, item, take }] of jobs.entries()) {
   const fam = cases.families[key];
-  const plan = enhancePlan({ kind: "image", family: fam.family, variant: fam.variant, text: item.prompt }, settings);
+  const plan = enhancePlan({ kind: args.kind === "video" ? "video" : "image", family: fam.family, variant: fam.variant, text: item.prompt }, settings);
   // Fixed per case unless asked otherwise, so a change to the enhancer is compared on the same seeds.
   const seed = args.seed === "random" ? crypto.randomInt(0, 2 ** 31) : crypto.createHash("sha1").update(`${key}/${item.id}/${take}`).digest().readUInt32BE(0) >>> 1;
   const at = {};
