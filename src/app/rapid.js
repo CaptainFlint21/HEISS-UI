@@ -72,7 +72,10 @@ export function rapidDetails(settings) {
   const s = settings || {};
   /** @type {Array<[string, string]>} */
   const rows = [];
-  if (s.rapid) {
+  if (s.rapid && Number(s.rapidCache) > 0) {
+    // Step reuse (ComfyUI's EasyCache) instead of the half-size start, for the models that one breaks.
+    rows.push(["Step reuse", Number(s.rapidCacheFrom) > 0 ? `From ${Math.round(Number(s.rapidCacheFrom) * 100)}% of the steps` : "On"]);
+  } else if (s.rapid) {
     const small = Number(s.rapidSmallSteps);
     const full = Number(s.rapidFullSteps);
     // From the node's own report where there is one; older pictures only have what was asked for.

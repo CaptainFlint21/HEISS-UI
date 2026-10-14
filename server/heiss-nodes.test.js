@@ -35,7 +35,8 @@ test("every feature on the pack needs a version the pinned pack has", () => {
     assert.ok(feature.version <= nodePacks.heiss.version, feature.id);
     for (const node of feature.nodes) assert.ok(nodePacks.heiss.nodes.includes(node), `${feature.id}: ${node}`);
   }
-  assert.equal(Math.max(...heissFeatures.map((feature) => feature.version)), nodePacks.heiss.version, "the pin is no newer than a feature needs");
+  // The pin may be newer than every feature needs: pack 9 only improves Rapid's pictures, and older copies keep Rapid.
+  assert.ok(Math.max(...heissFeatures.map((feature) => feature.version)) <= nodePacks.heiss.version);
 });
 
 test("install, update, restart and ready, from what ComfyUI loaded and what's on disk", () => {

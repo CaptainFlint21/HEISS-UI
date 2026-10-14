@@ -122,7 +122,7 @@ export function parametersText(body = {}, { width = 0, height = 0, hashes = {} }
   const loraHashes = loras.filter((lora) => hashes[lora.name]).map((lora) => `${stem(lora.name)}: ${hashes[lora.name]}`);
   if (loraHashes.length) settings.push(["Lora hashes", loraHashes.join(", ")]);
   // HEISS Rapid changes how a seed frames, so the seed alone doesn't bring the picture back without it.
-  if (body.rapid && body.rapidReport?.active !== false) settings.push(["HEISS Rapid", `switch ${body.rapid.at}`]);
+  if (body.rapid && body.rapidReport?.active !== false) settings.push(["HEISS Rapid", body.rapid.cache ? `step reuse ${body.rapid.cache.threshold} from ${body.rapid.cache.start}` : `switch ${body.rapid.at}`]);
   if (body.rapidGuidance) settings.push(["HEISS Rapid Guidance", `CFG until ${body.rapidGuidance.until}`]);
   if (appVersion) settings.push(["Version", `HEISS UI ${appVersion}`]);
   if (settings.length) lines.push(settings.map(([key, value]) => `${key}: ${field(value)}`).join(", "));

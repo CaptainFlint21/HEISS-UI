@@ -20,6 +20,8 @@ export const heissFeatures = [
     label: "Rapid",
     blurb: "Pictures in about half the time, with the same memory.",
     nodes: ["HeissRapid", "HeissRapidGuidance"],
+    // Runs on any copy from 2 on; pack 9 (the grow with the run's own noise) only makes its pictures closer to the
+    // seed, so an older copy keeps Rapid and is offered the update (node-packs.js pins 9).
     version: 2
   },
   {

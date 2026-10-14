@@ -104,6 +104,9 @@ export function sanitizeRapid(input, profile, { referenceAssets, inpaint }) {
   const family = families[profile.family];
   const spec = rapidFor(family, family?.variants.find((item) => item.id === profile.variant));
   if (!spec) return null;
+  // Step reuse instead of the half-size start (the family's `cache`): Speed moves where it begins, as it moves
+  // the switch: later is more careful.
+  if (spec.cache) return { cache: { threshold: spec.cache, start: Math.round(clamp(spec.cacheFrom + speedShift(input), 0.15, 0.6) * 100) / 100, end: 0.95 } };
   const at = Number(input.rapidAt);
   // The smoothing step after the switch costs one full-size step: worth it on longer runs, where it is a few
   // percent; on a 4-8 step distill it eats most of the gain (measured, docs/rapid.md). The benchmark can force it.
@@ -111,7 +114,23 @@ export function sanitizeRapid(input, profile, { referenceAssets, inpaint }) {
   // one decides for HEISS's runs.
   const steps = Number(input.steps) || Number(profile.defaults?.steps) || 0;
   const smooth = typeof input.rapidSmooth === "boolean" ? input.rapidSmooth : spec.smooth !== false && steps >= SMOOTH_FROM_STEPS;
-  return { at: Number.isFinite(at) && at >= 0.3 && at <= 0.99 ? at : Math.round(clamp(spec.at + speedShift(input), 0.45, 0.95) * 100) / 100, smooth };
+  // `rapidScale` / `rapidMinFull`: the start size and the full-size tail, for scripts/bench-rapid.mjs.
+  const scale = Number(input.rapidScale);
+  const minFull = Number(input.rapidMinFull);
+  return {
+    at: Number.isFinite(at) && at >= 0.3 && at <= 0.99 ? at : Math.round(clamp(spec.at + speedShift(input), 0.45, 0.95) * 100) / 100, smooth,
+    ...(Number.isFinite(scale) && scale >= 0.25 && scale <= 0.9 ? { scale } : {}),
+    ...(Number.isInteger(minFull) && minFull >= 1 && minFull <= 50 ? { minFull } : {})
+  };
+}
+
+/** EasyCache for this run ({ threshold, start, end }) or null: benchmark-only while it is measured (`rapidCache`). */
+export function sanitizeRapidCache(input, profile, { referenceAssets, inpaint }) {
+  const threshold = Number(input.rapidCache);
+  if (!(threshold > 0 && threshold <= 3) || profile.kind !== "image" || inpaint || referenceAssets.length || input.startImage || input.startImageId) return null;
+  const start = Number(input.rapidCacheStart);
+  const end = Number(input.rapidCacheEnd);
+  return { threshold, start: start >= 0 && start <= 1 ? start : 0.15, end: end >= 0 && end <= 1 ? end : 0.95, ...(input.rapidCacheNode === "LazyCache" ? { node: "LazyCache" } : {}) };
 }
 
 /**
@@ -216,6 +235,7 @@ function sanitizeFamilyBody(input, info, stats) {
     inpaint,
     rapid: sanitizeRapid(input, profile, { referenceAssets, inpaint }),
     rapidGuidance: sanitizeRapidGuidance(input, profile, cfg, { referenceAssets, inpaint }),
+    rapidCache: sanitizeRapidCache(input, profile, { referenceAssets, inpaint }),
     // The speed choice behind those switch points, for the picture's record; balanced is the default and goes unsaid.
     ...(RAPID_SPEED_SHIFT[input.rapidSpeed] && (input.rapid === true || input.rapidGuidance === true) ? { rapidSpeed: input.rapidSpeed } : {}),
     // "reference": the first reference guides the picture but doesn't frame it; the picked size does.

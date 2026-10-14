@@ -220,7 +220,9 @@ const hy15Shift = (shift) => ({ node: "ModelSamplingSD3", shift });
  * half size: `at` is the noise level where it grows to full size (0..1, an
  * SD-family sigma as sigma / (1 + sigma)), measured per family with
  * scripts/bench-rapid.mjs (docs/rapid.md). A variant's `rapid` overrides it;
- * `rapid: false` turns it off there (few-step distills).
+ * `rapid: false` turns it off there (few-step distills). `rapid: { cache, cacheFrom }`
+ * takes step reuse instead (ComfyUI's EasyCache at reuse threshold `cache`,
+ * from `cacheFrom` of the schedule), for a family the half-size start breaks.
  * docs/guides/MODELS.md walks through adding a family.
  */
 /**
@@ -401,7 +403,7 @@ export const families = {
     size: [1328, 1328]
   },
   qwen_image_21: {
-    label: "Qwen-Image 2.1", kind: "image", native: draws2k, sources: ["unet", "checkpoint"], rapid: { at: 0.7 },
+    label: "Qwen-Image 2.1", kind: "image", native: draws2k, sources: ["unet", "checkpoint"], rapid: { cache: 0.3, cacheFrom: 0.5 },
     slots: [{ slot: "encoder", label: "Qwen3-VL 8B", kinds: ["qwen3vl_8b"] }], clipType: "qwen_image",
     vae: ["qwen_image_21"], latent: "EmptyLatentImage", sizeStep: 32, negative: "qwen21", aspects: square,
     requiredNodes: ["TextEncodeQwenImage21"],
@@ -429,7 +431,7 @@ export const families = {
     variants: [
       // Raw is trained up to 1K (krea-ai/krea-2 README), Turbo up to 2K.
       { id: "raw", label: "Raw", match: (name) => isKrea2Raw(name), rawShift: true, native: draws2kMaybe, defaults: { steps: 28, cfg: 4.5, sampler: "euler", scheduler: "simple" } },
-      { id: "turbo", label: "Turbo", defaults: { steps: 8, cfg: 1, sampler: "euler", scheduler: "simple" } }
+      { id: "turbo", label: "Turbo", rapid: { at: 0.45 }, defaults: { steps: 8, cfg: 1, sampler: "euler", scheduler: "simple" } }
     ],
     size: [1024, 1024]
   },

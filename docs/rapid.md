@@ -74,10 +74,12 @@ Each family can carry `rapid: { at }`, and a variant can override or disable it 
 
 | Family | `at` | Basis |
 |---|---|---|
-| Krea 2 (Turbo, Raw) | 0.7 | LC's tests: 2×, detail holds |
+| Krea 2 Raw | 0.7 | LC's tests: 2×, detail holds |
+| Krea 2 Turbo | 0.45 | measured 2026-10-14: 6 of 8 steps small, 1.5× at 1024², 1.8× at 1536², pictures as at 0.7 |
 | Z-Image | 0.7 | LC |
 | Flux.2 Klein / Dev | 0.7 | LC (1.3× at 4 steps) |
-| Qwen-Image, Qwen-Image 2.1 | 0.7 | LC lists it; measure it |
+| Qwen-Image | 0.7 | LC lists it; measure it |
+| Qwen-Image 2.1 | step reuse instead (`cache: 0.3, cacheFrom: 0.5`) | measured 2026-10-14: the half-size start spots its skin; see Step reuse below |
 | Flux.1, Chroma | 0.85 to start | SwarmNeo: text breaks below about 0.94 at 40 steps. We measure with the text probe and choose. |
 | SDXL / Pony / Illustrious | 0.6 | LC's sweep (5 checkpoints, 4 samplers, 4 schedulers) |
 
@@ -232,3 +234,40 @@ The second part of Rapid, with its own switch: **HEISS Rapid Guidance** (`HeissR
 - Benchmark: `--rapid guide` (alone), `--with-guidance` (with on/fast), `--cfg-until a,b` (sweep).
 
 The pack moves with HEISS: `update: true` in node-packs.js brings an older installed copy to the pinned commit (one-click install and terminal steps), unless someone has edited it.
+
+
+## Step reuse, and one accelerator per model (2026-10-14)
+
+Rapid's first part is now one of two accelerators, chosen per family in `family-catalog.js`, never both:
+- **The half-size start** (`rapid: { at }`), for most families and every few-step distill.
+- **Step reuse** (`rapid: { cache, cacheFrom }`), ComfyUI's own `EasyCache`: on a step where the model's input barely moved, it reuses the model's last change instead of running it. It is for a family the half-size start breaks. It needs no node pack, only a ComfyUI that has `EasyCache` (capabilities say `false` otherwise). Speed moves where it begins, ±0.1 of the schedule, as it moves the switch.
+
+Measured on the RTX 3070 (8 GB), seed 42, portrait and text prompts. Sampling times; `--cache`, `--cache-start`, `--cache-end`, `--rapid-scale`, `--rapid-min-full`, `--sampler` and `--cfg` in the benchmark sweep these.
+
+| Model | Size | Off | Half-size start | Step reuse |
+|---|---|---|---|---|
+| Qwen-Image 2.1 (25 steps) | 1024² | 17.1s | 12.5s, spotted skin and a glitchy sign | 10.7s (0.3 from 0.4), clean at sheet scale |
+| Qwen-Image 2.1 | 1536² | 43.3s | 36.6s at 0.85 (no spots, still degraded) | 26.2s (0.3 from 0.4): menu clean, "1987" reads "1937"; **31.3s (0.3 from 0.5), text as off: shipped, 1.39×** |
+| Krea 2 Turbo (8 steps) | 1024² | 30.5s | 20.4s at 0.45 (22.2s at 0.7) | ≈25.5s: skips 1-2 of 8 |
+| Krea 2 Turbo | 1536² | 56.5s | 31.4s at 0.45 (35.5s at 0.7) | – |
+| Flux.2 Klein 9B (4 steps) | 1024² / 1536² | 7.9s / 16.4s | 6.3s / 11.2s | – |
+| Z-Image Turbo (8 steps) | 1024² | 13.4s | 10.1s | skips 0-2 of 8 |
+| Qwen-Image 2.1, shipped (0.3 from 0.5) | 1024² | 17.1s | – | 12.7s (1.35×), as off |
+| Krea 2 Edit merge int4 (8 steps) | 1024² | 8.7s | 5.4s at 0.45 (1.62×), tighter framing, text as its off | – |
+| Pony (SDXL, 25 steps, euler_ancestral, CFG 7) | 1024² | 12.0s | 9.3s (1.29×) | skips none |
+| Z-Image Turbo | 1536² | 28.0s | 18.8s (1.49×), text and skin hold; 0.45 at 1024² broke the chalkboard layout, so it keeps 0.7 | – |
+| Pony (SDXL, 25 steps, CFG 5, euler) | 1024² | 11.8s | – | 6.7s, but text smears |
+
+What the pictures showed:
+- **Step reuse from the default 15% of the schedule garbles small text** at 1536² (the chalkboard's "1.80" turned into "1.20" with doubled strokes) at every threshold from 0.15 to 0.3, and ending it at 80% did not help. Starting it at 40% keeps the menu as the run without it, at 0.2 and 0.3 alike, but the sign's small "EST. 1987" reads "1937" at both; 0.25 from 30% already ghosts a menu digit. From 50% (0.3) both read as off, at 1.39×: the catalog uses that, and Faster moves it back to 40% (1.65×). 0.12 from 40% is about as clean at 1.47×. Every setting leaves the face a touch darker than off, a small tonal shift, not damage. The pictures at 1024² looked the same as off at sheet scale, so look at text crops.
+- **The half-size start breaks Qwen-Image 2.1 at 0.7**: leopard-like spots on skin and a doubled outline on the sign, with or without the smoothing step. At 0.85 the spots are gone but the picture is still worse (harsh, over-sharpened skin, an invented header and a lost digit on the chalkboard) and it saves little.
+- **Step reuse does nothing on few-step distills** (Krea Turbo, Z-Image Turbo): there are no steps similar enough to skip. **With an ancestral sampler** (Pony's euler_ancestral) it skips none, since the fresh noise each step moves the input.
+- **On SDXL with euler it skips half the steps but smears text**, so SDXL keeps the half-size start.
+- **Together they destroy the picture** (Qwen 2.1 and Pony): EasyCache resets at the size change and reuses stale changes after it.
+- **ComfyUI's LazyCache** (`--cache-node LazyCache`) is faster than EasyCache on Qwen-Image 2.1 (1536²: 27.8s at 0.3 from 0.5, 1.56×) and keeps the text, but the sign's plaster turns blotchy with a purple cast and the chalk frame washes out. EasyCache stays. `QwenImage21Cache` only sets where the prompt prefix's KV cache lives; its default (auto) is already right.
+- **Krea 2 Turbo at 0.45** looks as at 0.7, text included. Its chalkboard is garbled with and without Rapid.
+- **Rejected**: a 0.375 start size (Krea text breaks), and one full-size step instead of two on Klein (1.97×, but softer, fewer raindrops and "BAKERRY"; a candidate for Faster only).
+
+**The grow with the run's own noise** (node pack `feature/rapid-v2`, 19d066f, PACK_VERSION 9, not pushed yet): at the switch the new high frequencies come from the noise the seed drew, not from a fresh draw. Same speed. At 1024² it keeps Rapid pictures closer to off: Krea 2 Turbo's portrait gets its raindrops back, and Flux.2 Klein's chalkboard reads "Croisant 2.50 / Coffee 1.80 / Pretzel 1.20" where the fresh draw gave duplicated, jumbled rows. Once pushed, `node-packs.js` pins that commit. At 1536² it is neutral to better (Krea the same; Klein's sign reads "EST 1987" where the fresh draw squashed it), and on the Krea 2 Edit int4 merge and Pony it changes nothing visible. Measured as SSIM against the run without Rapid (grey, 512²), it moves closer in 11 of 12 cases: Krea 2 Turbo portrait 0.47 → 0.61 (1024²) and 0.45 → 0.60 (1536²), Klein portrait 0.56 → 0.64, Klein text at 1536² 0.36 → 0.44; the one step back is Pony's text, 0.321 → 0.312. PSNR hardly moves (Rapid reframes, so pixels don't line up either way).
+
+**Step reuse on a long run with CFG**, measured on Qwen-Image 2.1 at CFG 4 as a stand-in (25 steps, two passes a step), 1024²: off 33.4s; step reuse (0.3 from 0.5) 23.8s, 1.41×, pictures as off; Rapid Guidance alone 22.5s, 1.48×; both 22.6s. Once Guidance has dropped CFG, the late steps are single passes, and those are the steps step reuse skips, so the two don't add up. The long-step CFG families (Krea 2 Raw, Z-Image Base, Qwen-Image, Flux.2 Dev, Chroma) already get this from Rapid Guidance and keep their half-size start; none of them were on this machine to confirm directly.
