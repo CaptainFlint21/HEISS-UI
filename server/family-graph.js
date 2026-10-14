@@ -277,6 +277,9 @@ export function familyGraph(body) {
   }
 
   // ---- Sample
+  // `rapidCache` ({ threshold, start, end }): ComfyUI's EasyCache reuses the model's last change on steps where
+  // its input barely moved, skipping the model pass. Benchmark-only while it is measured (docs/rapid.md).
+  if (body.rapidCache && family.kind === "image") model = [add("EasyCache", { model, reuse_threshold: body.rapidCache.threshold, start_percent: body.rapidCache.start, end_percent: body.rapidCache.end, verbose: false }), 0];
   let samples;
   if (family.sampling === "custom") {
     let sigmas = family.scheduler === "flux2"
@@ -386,7 +389,7 @@ function cfgGuider(add, { model, positive, negative, cfg, guidance = null }) {
 function customSampler(add, { seed, sampler, guider, sigmas, latent, rapid = null }) {
   const noise = add("RandomNoise", { noise_seed: seed });
   let samplerNode = [add("KSamplerSelect", { sampler_name: sampler }), 0];
-  if (rapid) samplerNode = [add("HeissRapid", { sampler: samplerNode, switch_at: rapid.at, scale: 0.5, min_full_steps: 2, smooth_switch: rapid.smooth !== false }), 0];
+  if (rapid) samplerNode = [add("HeissRapid", { sampler: samplerNode, switch_at: rapid.at, scale: rapid.scale ?? 0.5, min_full_steps: rapid.minFull ?? 2, smooth_switch: rapid.smooth !== false }), 0];
   return [add("SamplerCustomAdvanced", { noise: [noise, 0], guider: [guider, 0], sampler: samplerNode, sigmas: Array.isArray(sigmas) ? sigmas : [sigmas, 0], latent_image: latent }), 0];
 }
 
