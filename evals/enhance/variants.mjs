@@ -50,6 +50,12 @@ export const variants = {
   }),
   "len-tight": (plan) => ({ ...plan, system: plan.system.replace(/(\d+) to (\d+) words/, (match, low, high) => `${Math.round(low * 0.7)} to ${Math.round(high * 0.7)} words`), maxTokens: Math.round(plan.maxTokens * 0.75) }),
 
+  // Purple prose and invented details ("as if pulling back time", a torn leotard on a tired ballerina).
+  "plain": (plan) => ({
+    ...plan,
+    system: swap(plan.system, "Describe concretely and visually:", "Describe literally, like a photographer's shot list, with no metaphors or comparisons, and add only details that fit the person's picture as they described it:")
+  }),
+
   // Sampling.
   "temp-0.55": (plan) => ({ ...plan, temperature: 0.55 }),
   "temp-0.85": (plan) => ({ ...plan, temperature: 0.85 })

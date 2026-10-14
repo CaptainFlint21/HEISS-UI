@@ -1,5 +1,62 @@
 # Findings
 
+## Round 5: overnight A/B (2026-10-14, night)
+
+**Tooling.** `variants.mjs` changes what the app would send (cut a paragraph, rephrase, sampling) inside the eval only; `run.mjs --variant`; `ab.mjs` compares runs with today's `finishPrompt` applied to all, so runs before and after a cleanup change compare fairly. Its columns:
+- **flags:** consistency flags.
+- **variety:** word-set Jaccard between seeds of one case; lower means more varied.
+- **sameOpen:** cases whose seeds open with the same 6 words.
+- **keep:** share of a detailed input's content words still in the output.
+- **sfwNude:** SFW cases that came back with nudity.
+
+The set is `results/cases.mix.json`: 16 prompts (SFW, partnered and solo NSFW, vague, ramble, tags-in, a labelled prompt, Civitai references, a camera-spec prompt) × Krea, Qwen and Flux × 2 seeds.
+
+**Speed first.** With `--reserve-vram 2 --vram-headroom 1` and about 1.5 GB held by desktop apps, the 4.8 GB enhancer streamed at 8 tok/s even after a ComfyUI restart. With `--reserve-vram 1 --vram-headroom 0` it runs at 44 tok/s with identical outputs. For the night ComfyUI runs with those flags; the original flags are restored in the morning.
+
+**Round 1** (ab1-*, 10 variants):
+
+| variant | flags | variety | sameOpen | keep | sfwNude | words |
+|---|---|---|---|---|---|---|
+| base | 1% | 0.39 | 73% | 0.74 | 2/36 | 133 |
+| no-example | 2% | 0.43 | 76% | 0.72 | 0/36 | 124 |
+| no-style | 0% | 0.40 | 70% | 0.75 | 0/36 | 124 |
+| no-settle | 2% | 0.37 | 70% | 0.70 | 0/36 | 130 |
+| no-ownwords | 0% | 0.39 | 70% | 0.73 | 0/36 | 128 |
+| short-base | 0% | 0.35 | 67% | 0.74 | 0/36 | 132 |
+| notes-own-words | 2% | 0.39 | 73% | 0.75 | 2/36 | 133 |
+| polish-strong | 1% | 0.39 | 70% | 0.75 | 1/36 | 132 |
+| temp-0.55 | 0% | 0.43 | 82% | 0.76 | 0/36 | 130 |
+
+Read side by side:
+- **The example earns its place.** Without it, prompts turn into "Camera angle: / Light source: / Medium:" chains, and the car blowjob swaps roles.
+- **The other single-paragraph cuts shift results within the noise.** Short-base invented signage ("Lumpia King"); no-style invented a perfume label; base dressed a tired ballerina "bare-chested" twice.
+- **Polish-strong reads like base,** which already keeps detailed prompts (keep 0.74, with the camera spec, the labelled selfie and the Civitai portrait all intact).
+- **0.55 makes the seeds more alike** for no clear gain, so 0.7 stays.
+
+**Shipped from this round:**
+- `finishPrompt` settles "X or Y" hedges about one thing and drops the "no filters or stylization" sign-off (41 of 96 outputs carried it).
+- An idea longer than the usual word range keeps its room instead of being squeezed or cut at the token cap.
+
+## Round 4: scene consistency (2026-10-14)
+
+Read about 50 NSFW prose outputs in full; the recurring kinds:
+- **Position against orientation:** "on her back… from behind"; reverse cowgirl "lies on her back… facing the viewer"; titjob "facing him… as he stands behind her".
+- **Impossible support:** on her back on a balcony railing; him lying on the counter with her legs over his shoulders.
+- **Hedging:** "thighs or hips", "clothing — if any —", "depending on positioning".
+- **Hand budget:** "pulling her hair with one hand while thrusting into her with the other".
+- **Clothing kept on** during the act.
+- **POV confusion:** "you're kneeling behind her, your cock in her mouth… framing your face".
+
+The terms table itself modelled hedging: half its entries said "X or Y".
+
+**Fixes:**
+- **Base rule:** settle where every body is (lying, kneeling, sitting or standing, on what, facing which way, what each hand does), keep that one pose true, one definite choice per detail.
+- **Terms table:** one canonical pose per act with orientation (reverse cowgirl says her pose first), giver and receiver roles, and no "or".
+- **Cleanup:** hedges dropped in `finishPrompt`.
+- **Flagger:** `consistency.mjs`.
+
+Flags on the act, edge and solo probes went from 14 to 10 of 68. Missionary, mating press, cowgirl, reverse cowgirl and titjob are now coherent; "getting railed" got a default position (bent over, him behind) unless the idea gives one.
+
 ## Round 3: NSFW understanding (2026-10-14)
 
 **The act probe** (`cases.acts.json`, 12 common acts × 2 takes on Krea, results/acts-v8) showed a knowledge gap, not a wording problem. Only mating press, footjob and the POV blowjob came out right. "Missionary" became a religious missionary in a long-sleeved dress; "spitroasting" became two men with barbecue torches; 69 became plain intercourse; facesitting became her face in his lap; titfuck, him gripping her hips from behind; a handjob, with the giver and receiver swapped.
