@@ -32,7 +32,9 @@ version opens with a `> ` summary line, which the update pill shows.
   small HEISS UI Nodes pack it runs on. A seed frames a little differently
   with Rapid, so a seed you fix yourself runs without it. Based on SPEED
   (Xiao et al., 2026), with an extra step after the switch that keeps the
-  picture's contrast true to a run without it.
+  picture's contrast true to a run without it. On Qwen-Image 2.1, which the
+  half-size start spots, Rapid reuses the model's work on steps where little
+  changes instead (ComfyUI's EasyCache): 1.6× with the same picture.
 - **RTX video upscale (NVIDIA RTX cards).** Videos get an upscale arrow, and
   the size menu gets an RTX upscale row (None, 2K, 4K) under Resolution for
   video models: NVIDIA's RTX Video Super

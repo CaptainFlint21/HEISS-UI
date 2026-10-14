@@ -277,9 +277,12 @@ export function familyGraph(body) {
   }
 
   // ---- Sample
-  // `rapidCache` ({ threshold, start, end }): ComfyUI's EasyCache reuses the model's last change on steps where
-  // its input barely moved, skipping the model pass. Benchmark-only while it is measured (docs/rapid.md).
-  if (body.rapidCache && family.kind === "image") model = [add("EasyCache", { model, reuse_threshold: body.rapidCache.threshold, start_percent: body.rapidCache.start, end_percent: body.rapidCache.end, verbose: false }), 0];
+  // Rapid's step reuse (`rapid.cache`, or the benchmark's `rapidCache`: { threshold, start, end }): ComfyUI's
+  // EasyCache reuses the model's last change on steps where its input barely moved, skipping the model pass.
+  // A family takes it or the half-size start, never both (docs/rapid.md).
+  const cache = body.rapid?.cache || body.rapidCache;
+  if (cache && family.kind === "image") model = [add("EasyCache", { model, reuse_threshold: cache.threshold, start_percent: cache.start, end_percent: cache.end, verbose: false }), 0];
+  const rapidStart = body.rapid?.at ? body.rapid : null;
   let samples;
   if (family.sampling === "custom") {
     let sigmas = family.scheduler === "flux2"
@@ -290,7 +293,7 @@ export function familyGraph(body) {
     const guider = negative
       ? cfgGuider(add, { model, positive, negative, cfg: Number(body.cfg || 1), guidance: body.rapidGuidance })
       : add("BasicGuider", { model, conditioning: positive });
-    samples = customSampler(add, { model, seed, sampler: body.sampler || "euler", guider, sigmas, latent, rapid: body.rapid });
+    samples = customSampler(add, { model, seed, sampler: body.sampler || "euler", guider, sigmas, latent, rapid: rapidStart });
   } else if (family.sampling === "pair") {
     // High noise lays out the motion for the first half of the steps, low noise finishes.
     const steps = Number(body.steps || 20);
@@ -298,11 +301,11 @@ export function familyGraph(body) {
     const shared = { noise_seed: seed, steps, cfg: Number(body.cfg || 1), sampler_name: body.sampler || "euler", scheduler: body.scheduler || "simple", positive, negative };
     const high = add("KSamplerAdvanced", { ...shared, model, add_noise: "enable", latent_image: latent, start_at_step: 0, end_at_step: split, return_with_leftover_noise: "enable" });
     samples = [add("KSamplerAdvanced", { ...shared, model: lowModel, add_noise: "disable", latent_image: [high, 0], start_at_step: split, end_at_step: 10000, return_with_leftover_noise: "disable" }), 0];
-  } else if (body.rapid || body.rapidGuidance) {
+  } else if (rapidStart || body.rapidGuidance) {
     // KSampler's own pieces, so Rapid can wrap the sampler and the guider: the same noise, guidance and schedule.
     const sigmas = add("BasicScheduler", { model, scheduler: body.scheduler || "simple", steps: Number(body.steps || 20), denoise });
     const guider = cfgGuider(add, { model, positive, negative: negative || positive, cfg: Number(body.cfg || 1), guidance: body.rapidGuidance });
-    samples = customSampler(add, { seed, sampler: body.sampler || "euler", guider, sigmas, latent, rapid: body.rapid });
+    samples = customSampler(add, { seed, sampler: body.sampler || "euler", guider, sigmas, latent, rapid: rapidStart });
   } else {
     samples = [add("KSampler", {
       model, seed, steps: Number(body.steps || 20), cfg: Number(body.cfg || 1),

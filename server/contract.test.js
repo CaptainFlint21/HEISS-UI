@@ -170,7 +170,7 @@ function* cases(info) {
         if (family.references) yield { name: `${name}, with references`, family, variant, source, body: requestFor(familyId, family, variant, source, info, { referenceImages: ["ref-1.png", "ref-2.png"] }) };
         if (family.img2img || family.startImage) yield { name: `${name}, from a start image`, family, variant, source, body: requestFor(familyId, family, variant, source, info, { startImageComfy: "start.png", denoise: 0.6 }) };
         const rapid = rapidFor(family, variant);
-        if (rapid) yield { name: `${name}, with Rapid`, family, variant, source, body: requestFor(familyId, family, variant, source, info, { rapid: { ...rapid, smooth: true } }) };
+        if (rapid) yield { name: `${name}, with Rapid`, family, variant, source, body: requestFor(familyId, family, variant, source, info, { rapid: rapid.cache ? { cache: { threshold: rapid.cache, start: rapid.cacheFrom, end: 0.95 } } : { ...rapid, smooth: true } }) };
         if (guidanceFor(family, variant) && !["h3", "ideogram4", "mage", "sana", "pair"].includes(family.sampling)) yield { name: `${name}, with Rapid Guidance`, family, variant, source, body: requestFor(familyId, family, variant, source, info, { cfg: 4, rapidGuidance: { until: 0.3 } }) };
       }
     }

@@ -952,7 +952,7 @@ export function generationSettings(body) {
     referenceAssets: Array.isArray(body.referenceAssets) ? body.referenceAssets.map(({ slot, assetId, source, name }) => ({ slot, assetId, source, name })) : [],
     promptPolicy: body.promptPolicy || null,
     // Made with HEISS Rapid; reusing it with its seed keeps Rapid on, so the same picture comes back.
-    ...(body.rapid && body.rapidReport?.active !== false ? { rapid: true, rapidAt: body.rapid.at, rapidSmooth: body.rapid.smooth !== false } : {}),
+    ...(body.rapid && body.rapidReport?.active !== false ? (body.rapid.cache ? { rapid: true, rapidCache: body.rapid.cache.threshold, rapidCacheFrom: body.rapid.cache.start } : { rapid: true, rapidAt: body.rapid.at, rapidSmooth: body.rapid.smooth !== false }) : {}),
     // What the node reported it did: steps at half and full size, and the noise level where it really switched.
     ...(body.rapid && body.rapidReport?.active && body.rapidReport.smallSteps ? { rapidSmallSteps: body.rapidReport.smallSteps, rapidFullSteps: body.rapidReport.fullSteps, ...(body.rapidReport.switchNoise ? { rapidSwitchNoise: body.rapidReport.switchNoise } : {}) } : {}),
     ...(body.rapid && body.rapidReport?.active === false ? { rapidSkipped: body.rapidReport.reason || "skipped" } : {}),

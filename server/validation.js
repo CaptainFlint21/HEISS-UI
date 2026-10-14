@@ -104,6 +104,9 @@ export function sanitizeRapid(input, profile, { referenceAssets, inpaint }) {
   const family = families[profile.family];
   const spec = rapidFor(family, family?.variants.find((item) => item.id === profile.variant));
   if (!spec) return null;
+  // Step reuse instead of the half-size start (the family's `cache`): Speed moves where it begins, as it moves
+  // the switch: later is more careful.
+  if (spec.cache) return { cache: { threshold: spec.cache, start: Math.round(clamp(spec.cacheFrom + speedShift(input), 0.15, 0.6) * 100) / 100, end: 0.95 } };
   const at = Number(input.rapidAt);
   // The smoothing step after the switch costs one full-size step: worth it on longer runs, where it is a few
   // percent; on a 4-8 step distill it eats most of the gain (measured, docs/rapid.md). The benchmark can force it.

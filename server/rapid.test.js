@@ -82,14 +82,15 @@ test("Rapid is for the families measured for it, never few-step distills, video 
   for (const [id, family] of Object.entries(families)) {
     for (const item of family.variants) {
       const spec = rapidFor(family, item);
-      if (spec) assert.ok(spec.at >= 0.3 && spec.at <= 0.99, `${id}/${item.id} switch point ${spec.at}`);
+      if (spec?.cache) assert.ok(spec.cache > 0 && spec.cacheFrom >= 0.15 && spec.cacheFrom <= 0.6, `${id}/${item.id} step reuse`);
+      else if (spec) assert.ok(spec.at >= 0.3 && spec.at <= 0.99, `${id}/${item.id} switch point ${spec.at}`);
       if (spec) assert.equal(family.kind, "image", `${id} is not an image family`);
     }
   }
 });
 
 test("validation keeps Rapid only for a text-to-image run of a ready model", () => {
-  const profile = { kind: "image", family: "krea2", variant: "turbo", capabilities: { rapid: true } };
+  const profile = { kind: "image", family: "krea2", variant: "raw", capabilities: { rapid: true } };
   const plain = { referenceAssets: [], inpaint: null };
   assert.deepEqual(sanitizeRapid({ rapid: true, steps: 28 }, profile, plain), { at: 0.7, smooth: true });
   assert.deepEqual(sanitizeRapid({ rapid: true, steps: 8 }, profile, plain), { at: 0.7, smooth: false }, "a few-step run skips the smoothing step");
@@ -103,6 +104,20 @@ test("validation keeps Rapid only for a text-to-image run of a ready model", () 
   assert.deepEqual(sanitizeRapid({ rapid: true, rapidAt: 0.85, rapidSmooth: false }, profile, plain), { at: 0.85, smooth: false });
   assert.deepEqual(sanitizeRapid({ rapid: true, steps: 4, rapidSmooth: true }, profile, plain), { at: 0.7, smooth: true });
   assert.deepEqual(sanitizeRapid({ rapid: true, rapidAt: 5 }, profile, plain), { at: 0.7, smooth: false }, "out of range falls back");
+});
+
+test("each model gets one accelerator: the half-size start, or step reuse where that start breaks it", () => {
+  const plain = { referenceAssets: [], inpaint: null };
+  // Krea 2 Turbo grows later than Raw: 6 of its 8 steps at half size (measured, docs/rapid.md).
+  assert.deepEqual(sanitizeRapid({ rapid: true, steps: 8 }, { kind: "image", family: "krea2", variant: "turbo", capabilities: { rapid: true } }, plain), { at: 0.45, smooth: false });
+  // Qwen-Image 2.1 spots at half size: step reuse instead, from 40% of the schedule; Speed moves where it begins.
+  const qwen = { kind: "image", family: "qwen_image_21", variant: "standard", capabilities: { rapid: true } };
+  assert.deepEqual(sanitizeRapid({ rapid: true, steps: 25 }, qwen, plain), { cache: { threshold: 0.3, start: 0.4, end: 0.95 } });
+  assert.equal(sanitizeRapid({ rapid: true, rapidSpeed: "faster" }, qwen, plain).cache.start, 0.3);
+  assert.equal(sanitizeRapid({ rapid: true, rapidSpeed: "careful" }, qwen, plain).cache.start, 0.5);
+  const family = families.qwen_image_21;
+  assert.equal(rapidCapability(family, family.variants[0], { EasyCache: {} }), "ready", "ComfyUI's own node: nothing to install");
+  assert.equal(rapidCapability(family, family.variants[0], withRapid), false, "a ComfyUI without EasyCache");
 });
 
 /* ------------------------------------------------------------ records */
@@ -192,7 +207,7 @@ test("validation keeps Rapid Guidance for ready models on runs with CFG above 1"
 });
 
 test("the speed choice moves both switch points, within limits", () => {
-  const start = { kind: "image", family: "krea2", variant: "turbo", capabilities: { rapid: true } };
+  const start = { kind: "image", family: "krea2", variant: "raw", capabilities: { rapid: true } };
   const plain = { referenceAssets: [], inpaint: null };
   assert.equal(sanitizeRapid({ rapid: true, rapidSpeed: "faster" }, start, plain).at, 0.6);
   assert.equal(sanitizeRapid({ rapid: true, rapidSpeed: "careful" }, start, plain).at, 0.8);

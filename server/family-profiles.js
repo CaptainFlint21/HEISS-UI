@@ -93,7 +93,10 @@ export function rapidCapability(family, variant, info, { runner = null, part = "
   if (runner || ownGraphs.has(family.sampling) || family.ownLoaders) return false;
   // A quantized checkpoint's own loader (NF4): its kernels are untested at other latent sizes.
   if (quant && part === "start") return false;
-  if (!(part === "guidance" ? guidanceFor(family, variant) : rapidFor(family, variant))) return false;
+  const spec = part === "guidance" ? guidanceFor(family, variant) : rapidFor(family, variant);
+  if (!spec) return false;
+  // Step reuse is ComfyUI's own EasyCache: nothing to install, only a ComfyUI recent enough to have it.
+  if (spec.cache) return hasNode(info, "EasyCache") ? "ready" : false;
   return hasNode(info, part === "guidance" ? "HeissRapidGuidance" : "HeissRapid") ? "ready" : "install";
 }
 

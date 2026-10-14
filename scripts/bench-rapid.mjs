@@ -28,6 +28,7 @@
 //   --seeds n,...      (default 1234567,42)
 //   --prompts a,b      prompt ids from PROMPTS below (default all)
 //   --steps n          override every model's default step count
+//   --sampler s / --cfg n   override every model's sampler / CFG
 //   --out DIR          (default bench-results/<timestamp>)
 //   --no-images        don't download the pictures
 //   --dry              print the first graph for each model (Rapid as asked) and queue nothing
@@ -250,7 +251,9 @@ function graphFor(profile, { prompt, seed, width, height, mode = { rapid: false 
     rapidCache: opts.cache ? Number(opts.cache) : undefined, rapidCacheStart: opts["cache-start"] ? Number(opts["cache-start"]) : undefined, rapidCacheEnd: opts["cache-end"] ? Number(opts["cache-end"]) : undefined,
     rapidScale: mode.rapid && opts["rapid-scale"] ? Number(opts["rapid-scale"]) : undefined, rapidMinFull: mode.rapid && opts["rapid-min-full"] ? Number(opts["rapid-min-full"]) : undefined,
     rapidGuidance: mode.rapidGuidance, rapidCfgUntil: mode.rapidCfgUntil,
-    ...(opts.steps ? { steps: Number(opts.steps) } : {})
+    ...(opts.steps ? { steps: Number(opts.steps) } : {}),
+    ...(opts.sampler ? { sampler: opts.sampler } : {}),
+    ...(opts.cfg ? { cfg: Number(opts.cfg) } : {})
   };
   const body = sanitizeGenerateBody(input, info, stats);
   return imageGraph(body).then((graph) => ({ graph, body }));
