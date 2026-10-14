@@ -23,13 +23,13 @@ export const nodePacks = {
     name: "HEISS UI Nodes",
     repository: "https://github.com/tristmeister/ComfyUI-HEISS-UI-Nodes.git",
     folder: "ComfyUI-HEISS-UI-Nodes",
-    commit: "e3bf621dd2538724340404bede1f1e208132c0fa",
-    ref: "main, 2026-10-13",
+    commit: "19d066f1276247185cdcef001c30b3711bb11ad3",
+    ref: "feature/rapid-v2, 2026-10-14",
     search: "HEISS UI",
     // It grows with HEISS: an installed older copy is updated to `commit` (pack-installer.js).
     update: true,
     // PACK_VERSION in the pack's heiss_info.py at `commit`; what each feature needs is in heiss-nodes.js.
-    version: 8,
+    version: 9,
     versionFile: "heiss_info.py",
     nodes: ["HeissRapid", "HeissRapidGuidance", "HeissRTXVideo", "HeissRTXUpscale", "HeissInpaintStitch", "HeissPromptEnhance"]
   },
@@ -39,8 +39,8 @@ export const nodePacks = {
     name: "NVIDIA RTX video package",
     repository: "https://github.com/tristmeister/ComfyUI-HEISS-UI-Nodes.git",
     folder: "ComfyUI-HEISS-UI-Nodes",
-    commit: "e3bf621dd2538724340404bede1f1e208132c0fa",
-    ref: "main, 2026-10-13",
+    commit: "19d066f1276247185cdcef001c30b3711bb11ad3",
+    ref: "feature/rapid-v2, 2026-10-14",
     update: true,
     requirements: "requirements-rtx.txt",
     // NVIDIA hosts the wheels; PyPI only has a stub that fetches them while installing.
