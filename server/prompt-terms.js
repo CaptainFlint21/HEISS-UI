@@ -69,7 +69,7 @@ export const sexTerms = [
   { match: /\bcum ?shot\b|\bcumming on\b/i, means: "he is cumming, spurting onto her", tags: "ejaculation, cum" },
   { match: /\bsquirt\w*\b/i, ambiguous: true, means: "fluid spraying from her pussy as she comes", tags: "female ejaculation, squirting" },
   { match: /\bahegao\b/i, means: "her orgasm face: eyes rolled up, tongue out, mouth open", tags: "ahegao, rolling eyes, tongue out, open mouth" },
-  { match: /\bpegging\b/i, means: "she wears a strap-on and fucks him in the ass", tags: "pegging, strap-on, femdom, anal" },
+  { match: /\bpegging\b/i, means: "he is on all fours facing down, his ass toward her; she kneels behind him wearing a strap-on harness, its dildo pushed into his ass, fucking him", tags: "pegging, strap-on, femdom, anal" },
   { match: /\b(scissoring|tribbing|tribadism)\b/i, ambiguous: true, means: "two women with their legs interlocked, pussies pressed and grinding together", tags: "tribadism, yuri, 2girls, scissoring" },
   { match: /\bglory ?hole\b/i, means: "a cock through a hole in a stall partition, the man behind it unseen", tags: "glory hole, penis, wall" },
   { match: /\bgrinding on\b|\bdry ?humping\b|\blap ?dance\b/i, ambiguous: true, means: "she straddles him and grinds her hips on his lap", tags: "straddling, grinding, lap dance" }
