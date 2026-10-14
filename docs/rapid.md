@@ -264,6 +264,7 @@ What the pictures showed:
 - **Step reuse does nothing on few-step distills** (Krea Turbo, Z-Image Turbo): there are no steps similar enough to skip. **With an ancestral sampler** (Pony's euler_ancestral) it skips none, since the fresh noise each step moves the input.
 - **On SDXL with euler it skips half the steps but smears text**, so SDXL keeps the half-size start.
 - **Together they destroy the picture** (Qwen 2.1 and Pony): EasyCache resets at the size change and reuses stale changes after it.
+- **ComfyUI's LazyCache** (`--cache-node LazyCache`) is faster than EasyCache on Qwen-Image 2.1 (1536²: 27.8s at 0.3 from 0.5, 1.56×) and keeps the text, but the sign's plaster turns blotchy with a purple cast and the chalk frame washes out. EasyCache stays. `QwenImage21Cache` only sets where the prompt prefix's KV cache lives; its default (auto) is already right.
 - **Krea 2 Turbo at 0.45** looks as at 0.7, text included. Its chalkboard is garbled with and without Rapid.
 - **Rejected**: a 0.375 start size (Krea text breaks), and one full-size step instead of two on Klein (1.97×, but softer, fewer raindrops and "BAKERRY"; a candidate for Faster only).
 

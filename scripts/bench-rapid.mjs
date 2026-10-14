@@ -21,6 +21,7 @@
 //   --rapid-min-full n full-size steps kept at the end (default 2)
 //   --cache t          add ComfyUI's EasyCache at reuse threshold t to every run (off and on alike)
 //   --cache-start p / --cache-end p   its window, as a share of the schedule (default 0.15 / 0.95)
+//   --cache-node LazyCache   ComfyUI's LazyCache in place of EasyCache
 //                      guide = Rapid Guidance only (CFG while the noise is high), no half-size start
 //   --with-guidance    add Rapid Guidance to the on/fast runs too
 //   --cfg-until a,b    guidance cut-off noise levels to sweep for guide runs (default: the family's own)
@@ -248,7 +249,7 @@ function graphFor(profile, { prompt, seed, width, height, mode = { rapid: false 
   const input = {
     workflow: profile.workflow, profileId: profile.id, model: profile.model, kind: "image",
     prompt, seed, width, height, count: 1, rapid: mode.rapid, rapidAt: mode.rapidAt, rapidSmooth: mode.rapidSmooth,
-    rapidCache: opts.cache ? Number(opts.cache) : undefined, rapidCacheStart: opts["cache-start"] ? Number(opts["cache-start"]) : undefined, rapidCacheEnd: opts["cache-end"] ? Number(opts["cache-end"]) : undefined,
+    rapidCache: opts.cache ? Number(opts.cache) : undefined, rapidCacheStart: opts["cache-start"] ? Number(opts["cache-start"]) : undefined, rapidCacheEnd: opts["cache-end"] ? Number(opts["cache-end"]) : undefined, rapidCacheNode: opts["cache-node"],
     rapidScale: mode.rapid && opts["rapid-scale"] ? Number(opts["rapid-scale"]) : undefined, rapidMinFull: mode.rapid && opts["rapid-min-full"] ? Number(opts["rapid-min-full"]) : undefined,
     rapidGuidance: mode.rapidGuidance, rapidCfgUntil: mode.rapidCfgUntil,
     ...(opts.steps ? { steps: Number(opts.steps) } : {}),

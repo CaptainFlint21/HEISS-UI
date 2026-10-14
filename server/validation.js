@@ -130,7 +130,7 @@ export function sanitizeRapidCache(input, profile, { referenceAssets, inpaint })
   if (!(threshold > 0 && threshold <= 3) || profile.kind !== "image" || inpaint || referenceAssets.length || input.startImage || input.startImageId) return null;
   const start = Number(input.rapidCacheStart);
   const end = Number(input.rapidCacheEnd);
-  return { threshold, start: start >= 0 && start <= 1 ? start : 0.15, end: end >= 0 && end <= 1 ? end : 0.95 };
+  return { threshold, start: start >= 0 && start <= 1 ? start : 0.15, end: end >= 0 && end <= 1 ? end : 0.95, ...(input.rapidCacheNode === "LazyCache" ? { node: "LazyCache" } : {}) };
 }
 
 /**

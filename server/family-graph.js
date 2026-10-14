@@ -281,7 +281,7 @@ export function familyGraph(body) {
   // EasyCache reuses the model's last change on steps where its input barely moved, skipping the model pass.
   // A family takes it or the half-size start, never both (docs/rapid.md).
   const cache = body.rapid?.cache || body.rapidCache;
-  if (cache && family.kind === "image") model = [add("EasyCache", { model, reuse_threshold: cache.threshold, start_percent: cache.start, end_percent: cache.end, verbose: false }), 0];
+  if (cache && family.kind === "image") model = [add(cache.node || "EasyCache", { model, reuse_threshold: cache.threshold, start_percent: cache.start, end_percent: cache.end, verbose: false }), 0];
   const rapidStart = body.rapid?.at ? body.rapid : null;
   let samples;
   if (family.sampling === "custom") {
