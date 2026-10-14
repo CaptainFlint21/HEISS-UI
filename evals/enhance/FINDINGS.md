@@ -1,5 +1,11 @@
 # Findings
 
+## Round 2 (2026-10-14)
+
+- **Already-good prompts in** (Civitai Krea #13, Qwen #12, Flux #5 used as input; results/refs-in): they come back nearly verbatim, tidied, every detail kept. The Flux one's Markdown sheet became clean prose with all its placements. The only additions were the habitual "shallow depth of field, no filters" on phone shots.
+- **Decay habit** (r2-control vs r2-cond): rewording the style line to keep things "in the condition the person gave" changed nothing (58 vs 59 wear words in 16 runs). The wear comes from "70s / vintage / grandma's", and is mostly a fair reading; only the half-baked pie is a real error. Reverted.
+- **Sounds from the user turn** (r2-turn): ending the user turn with "Write the image prompt: only what the camera sees." left the party ramble's music and door-banging in 6 of 6 takes. That's the fourth mechanism tried; this model keeps whatever the person explicitly wrote. Reverted.
+
 ## Round 1: v1–v8 (2026-10-14)
 
 Targeted runs on the cases each change touched (results/v1 … v8, fid-*, v6-holdout, v7-holdout, video-check, model-*), then a full re-run (results/v8-full) against the baseline. Held-out prompts (`cases-holdout.json`) were never tuned on; they only checked that a change generalises, and it did.
