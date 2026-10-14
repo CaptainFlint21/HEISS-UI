@@ -113,8 +113,29 @@ const motionRules = `Describe only what is seen and how it moves. Every moving t
 
 const soundRules = `Weave the sound in alongside the action, not at the end: ambient sound, effects, music, and any speech in double quotes with how it is said.`;
 
-/** The system prompt for one target, family, the idea (for the sex terms it uses) and the person's own standing instructions. */
-export function systemPrompt(target, { family = "", variant = "", instructions = "", text = "" } = {}) {
+/**
+ * What a short idea leaves open gets a fresh roll each time: left to itself the model writes its single likeliest
+ * version ("portrait of a woman" came back as the same centered, dark-haired woman in 4 of 4 takes), and Try again
+ * changed nothing. Anything the idea says wins over the roll.
+ */
+const openChoices = {
+  framing: ["a close-up", "a medium shot from the waist up", "a full-length shot", "a wide shot that shows the surroundings", "a high angle looking down", "a low angle looking up", "a candid side view", "an over-the-shoulder view"],
+  light: ["soft window light", "golden-hour sun", "flat overcast daylight", "hard midday sun", "a single warm lamp", "neon and street light", "blue-hour dusk light", "direct on-camera flash", "candlelight", "soft studio light"]
+};
+
+/** A choice from `list` for this roll; `salt` keeps the picks for different lists independent. */
+export function rolled(list, roll = 0, salt = 0) {
+  let x = (Math.floor(Math.abs(roll)) ^ Math.imul(salt + 1, 0x9e3779b1)) >>> 0;
+  x = Math.imul(x ^ (x >>> 16), 0x45d9f3b) >>> 0;
+  x = (x ^ (x >>> 16)) >>> 0;
+  return list[x % list.length];
+}
+
+// Only for a short idea: a detailed prompt already chose its framing and light, or meant to leave them.
+const rollFor = (text, roll) => (wordCount(text) > 40 ? "" : `Where the idea leaves them open, this time use ${rolled(openChoices.framing, roll, 1)} and ${rolled(openChoices.light, roll, 2)}.`);
+
+/** The system prompt for one target, family, the idea (for the sex terms it uses), the roll for what it leaves open, and the person's own standing instructions. */
+export function systemPrompt(target, { family = "", variant = "", instructions = "", text = "", roll = 0 } = {}) {
   const [low, high] = promptLength(target, family, wordCount(text));
   const words = `${low} to ${high} words`;
   const sound = audioFamilies.has(family) ? `\n\n${soundRules}` : "";
@@ -122,7 +143,7 @@ export function systemPrompt(target, { family = "", variant = "", instructions =
   const clip = audioFamilies.has(family) ? "video with sound" : "silent video";
   const quality = tagStyle(family, variant) || tagVariants.anime;
   const task = {
-    image: `Turn the person's idea into one image prompt: ${words} of plain, concrete sentences about what the camera sees. ${imageFill}\n\n${visualStyle}\n\n${imageExample}`,
+    image: `Turn the person's idea into one image prompt: ${words} of plain, concrete sentences about what the camera sees. ${imageFill}\n\n${visualStyle}\n\n${imageExample}${rollFor(text, roll) ? `\n\n${rollFor(text, roll)}` : ""}`,
     tags: `Turn the person's idea into an image prompt for an anime model. ${tagRules(quality)}\n\nUse ${low} to ${high} tags.`,
     describe: `Look at the picture and write the prompt that would make it again: a single flowing paragraph of ${words} in natural sentences, ${imageOrder}\n\nDescribe only what is there, and name the medium and style exactly. Describe people's visible appearance, clothing or nudity, and pose plainly and accurately. If the person adds words, they say what to focus on or change.\n\n${visualStyle} ${seenText}`,
     "tags-describe": `Look at the picture and write the tags that would make it again with an anime model. ${tagRules(quality)}\n\nUse ${low} to ${high} tags; describe only what is there.`,
@@ -130,7 +151,7 @@ export function systemPrompt(target, { family = "", variant = "", instructions =
     video: `Turn the person's idea into one prompt for a ${clip}: a single paragraph of ${words} describing one shot as it unfolds. Start with the subject and the setting, then the action step by step, then lighting, atmosphere and style.\n\n${motionRules}${sound}\n\n${visualStyle} ${ideaText}`,
     motion: `The picture is the first frame of a ${clip}. Write what happens next, in a single paragraph of ${words}: what moves, how, and in what order, and what the camera does. Name the subjects so the motion is clear, but do not describe again what is already visible, and never contradict the picture. If the person gave no idea, invent natural motion that suits the picture and brings it to life.\n\n${motionRules}${sound}`
   }[target];
-  const terms = sexTermNotes(text, { tags: isTagTarget(target) });
+  const terms = sexTermNotes(text, { tags: isTagTarget(target), roll });
   const own = String(instructions || "").trim();
   return `${baseRules}\n\n${task}${terms ? `\n\n${terms}` : ""}${own ? `\n\nThe person's standing instructions, which win over the above where they differ:\n${own}` : ""}`;
 }
@@ -226,11 +247,11 @@ export function finishPrompt(target, text = "", family = "") {
  * the saved settings. /api/enhance and evals/enhance both build their runs here,
  * so the eval measures exactly what the app sends.
  */
-export function enhancePlan({ kind = "image", family = "", variant = "", text = "", hasImage = false, editing = false, again = false } = {}, settings = enhanceDefaults) {
+export function enhancePlan({ kind = "image", family = "", variant = "", text = "", hasImage = false, editing = false, again = false, roll = crypto.randomInt(0, 2 ** 31) } = {}, settings = enhanceDefaults) {
   const target = enhanceTarget({ kind, family, variant, hasImage, hasText: Boolean(String(text).trim()), editing });
   return {
     target,
-    system: systemPrompt(target, { family, variant, instructions: settings.instructions, text }),
+    system: systemPrompt(target, { family, variant, instructions: settings.instructions, text, roll }),
     prompt: userTurn(target, text),
     maxTokens: tokenBudget(target, family, wordCount(text)),
     // "Again" asks for another take: a little more freedom than the first.

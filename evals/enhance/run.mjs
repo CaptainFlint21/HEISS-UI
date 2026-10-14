@@ -44,11 +44,12 @@ console.log(`${jobs.length} runs · ${model} · creativity ${settings.creativity
 
 for (const [index, { key, item, take }] of jobs.entries()) {
   const fam = cases.families[key];
-  const appPlan = enhancePlan({ kind: args.kind === "video" ? "video" : "image", family: fam.family, variant: fam.variant, text: item.prompt }, settings);
+  // Fixed per case unless asked otherwise, so a change to the enhancer is compared on the same seeds; the roll for
+  // what the idea leaves open comes from the same seed.
+  const seed = args.seed === "random" ? crypto.randomInt(0, 2 ** 31) : crypto.createHash("sha1").update(`${key}/${item.id}/${take}`).digest().readUInt32BE(0) >>> 1;
+  const appPlan = enhancePlan({ kind: args.kind === "video" ? "video" : "image", family: fam.family, variant: fam.variant, text: item.prompt, roll: seed }, settings);
   // --variant: an A/B change to what the app would send (variants.mjs).
   const plan = applyVariant(args.variant, appPlan, { item, family: fam });
-  // Fixed per case unless asked otherwise, so a change to the enhancer is compared on the same seeds.
-  const seed = args.seed === "random" ? crypto.randomInt(0, 2 ** 31) : crypto.createHash("sha1").update(`${key}/${item.id}/${take}`).digest().readUInt32BE(0) >>> 1;
   const at = {};
   let stats = null;
   let raw = "";

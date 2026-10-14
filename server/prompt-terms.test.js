@@ -10,7 +10,7 @@ test("sex terms are found in the way people write them", () => {
   assert.deepEqual(found("two guys spitroasting a girl on a kitchen table"), ["spitroasting"]);
   assert.deepEqual(found("doggystyle in front of a mirror"), ["doggystyle"]);
   assert.deepEqual(found("69 on a hotel bed"), ["69"]);
-  assert.deepEqual(found("thick latina getting fucked missionary on a cheap motel bed"), ["missionary", "getting fucked"]);
+  assert.deepEqual(found("thick latina getting fucked missionary on a cheap motel bed"), ["missionary"]);
   assert.deepEqual(found("missionary on a sofa, her legs wrapped around him"), ["missionary"]);
   assert.deepEqual(found("brunette giving a handjob in the back seat"), ["handjob"]);
 });

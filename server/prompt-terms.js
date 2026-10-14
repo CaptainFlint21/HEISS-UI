@@ -31,18 +31,19 @@ export const sexTerms = [
   { match: /\b(69|sixty-?nine)\b(?=.*\bbed\b)/i, means: "they lie head to toe, one on top of the other, each with their mouth on the other's genitals at the same time", tags: "69, fellatio, cunnilingus, oral, hetero" },
   { match: /\b(69|sixty-?nine)\b(?!.*\bbed\b)/i, ambiguous: true, means: "they lie head to toe, one on top of the other, each with their mouth on the other's genitals at the same time", tags: "69, fellatio, cunnilingus, oral, hetero" },
   { match: /\bface ?sitting\b|\bsits? on (his|her) face\b/i, means: "he lies on his back; she sits astride his face, her pussy on his mouth, her thighs around his head", tags: "facesitting, cunnilingus, sitting on face, girl on top, hetero" },
-  { match: /\bblow ?jobs?\b|\bbj\b|\bsucking (his |a |the )?(cock|dick)\b|\bfellatio\b/i, means: "the giver kneels in front of the receiver, facing him, his cock in her mouth, sucking it; the cock belongs to the one receiving, usually a man standing", tags: "fellatio, oral, penis, hetero" },
-  { match: /\b(giving|gives|give) (him )?head\b|\bgo(ing|es)? down on him\b/i, means: "the giver kneels in front of the receiver, facing him, his cock in her mouth, sucking it; the cock belongs to the one receiving, usually a man standing", tags: "fellatio, oral, penis, hetero" },
+  { match: /\bblow ?jobs?\b|\bbj\b|\bsucking (his |a |the )?(cock|dick)\b|\bfellatio\b/i, means: ["the giver kneels in front of the receiver as he stands, his cock in her mouth; the cock belongs to the one receiving, usually a man", "the receiver lies back on the bed; the giver lies between his legs, her head over his lap, his cock in her mouth; the cock belongs to the one receiving, usually a man", "the receiver sits on a couch; the giver kneels between his knees, his cock in her mouth; the cock belongs to the one receiving, usually a man", "the receiver stands; the giver sits on the edge of the bed in front of him, leaning forward, his cock in her mouth; the cock belongs to the one receiving, usually a man"], tags: "fellatio, oral, penis, hetero" },
+  { match: /\b(giving|gives|give) (him )?head\b|\bgo(ing|es)? down on him\b/i, means: ["the giver kneels in front of the receiver as he stands, his cock in her mouth; the cock belongs to the one receiving, usually a man", "the receiver lies back on the bed; the giver lies between his legs, her head over his lap, his cock in her mouth; the cock belongs to the one receiving, usually a man", "the receiver sits on a couch; the giver kneels between his knees, his cock in her mouth; the cock belongs to the one receiving, usually a man", "the receiver stands; the giver sits on the edge of the bed in front of him, leaning forward, his cock in her mouth; the cock belongs to the one receiving, usually a man"], tags: "fellatio, oral, penis, hetero" },
   { match: /\bgo(ing|es)? down on her\b/i, means: "the giver's mouth is on her pussy, licking it, head between her thighs", tags: "cunnilingus, oral, head between thighs" },
   { match: /\b(riding|rides|bouncing on) (his|a|the|that) (cock|dick)\b/i, means: "she sits astride the man lying under her, his cock inside her, moving up and down on it", tags: "girl on top, straddling, sex, hetero" },
-  { match: /\b(getting|gets|got|being) (fucked|railed|pounded|banged|drilled|plowed|bred|dicked down)\b/i, means: "a man fucking her hard; unless the idea gives the position, she is bent over something in the scene with him standing behind her, fucking her from behind", tags: "sex, hetero" },
+  { general: true, match: /\b(getting|gets|got|being) (fucked|railed|pounded|banged|drilled|plowed|bred|dicked down)\b/i, means: ["a man fucking her: she lies on her back, legs wrapped around his hips; he lies on top of her, face to face, fucking her", "a man fucking her: she sits upright astride him as he lies on his back, riding his cock", "a man fucking her: she is on her hands and knees; he kneels behind her, fucking her from behind", "a man fucking her: both lie on their sides, his front against her back, fucking her from behind", "a man fucking her: both standing, her back against the wall, one of her legs lifted around his hip, him fucking her", "a man fucking her: she lies flat on her stomach; he lies on top of her back, fucking her from behind", "a man fucking her: she is bent over the edge of the bed; he stands behind her, fucking her from behind"], tags: "sex, hetero" },
+  { general: true, match: /\b((having|have|has|had) sex|fucking|fucks|making love|make love|sex (on|in|against)|doing it)\b/i, means: ["she lies on her back, legs wrapped around his hips; he lies on top of her, face to face, fucking her", "she sits upright astride him as he lies on his back, riding his cock", "she is on her hands and knees; he kneels behind her, fucking her from behind", "both lie on their sides, his front against her back, fucking her from behind", "both standing, her back against the wall, one of her legs lifted around his hip, him fucking her", "she lies flat on her stomach; he lies on top of her back, fucking her from behind", "she is bent over the edge of the bed; he stands behind her, fucking her from behind"], tags: "sex, hetero" },
   { match: /\bdeep ?throat\w*\b/i, means: "his cock is pushed all the way down her throat, her lips at the base", tags: "deepthroat, fellatio, irrumatio, hetero" },
   { match: /\b(face ?fuck\w*|throat ?fuck\w*|skull ?fuck\w*)\b/i, means: "he holds her head and thrusts his cock into her mouth and throat", tags: "irrumatio, deepthroat, head grab, fellatio, hetero" },
   { match: /\b(cunnilingus|eating (her|pussy)|eats? (her|pussy|her pussy) out|eating her out|licking (her|pussy|her pussy))\b/i, means: "she lies back with her legs spread; he is between her thighs, facing her pussy, his mouth on it, licking it", tags: "cunnilingus, oral, head between thighs, hetero" },
   { match: /\b(rimming|rim ?job|ass ?licking|licking (his|her) ass)\b/i, means: "one licks the other's anus, face pressed between the cheeks", tags: "anilingus, ass, oral" },
   { match: /\bhand ?jobs?\b|\bjerking (him|his cock) off\b|\bstroking his (cock|dick)\b/i, means: "the giver sits close beside the receiver, her hand wrapped around the receiver's cock, stroking it; the cock belongs to the one receiving, usually a man", tags: "handjob, penis, hetero" },
   // Solo: one person, her own hands or a toy, nobody else in the picture.
-  { match: /\bmasturbat\w*\b|\btouching (herself|her pussy)\b|\bplaying with (herself|her pussy)\b|\bpleasuring herself\b|\bjilling\b/i, means: "alone, no partner: she lies back with her legs apart, one hand between her legs rubbing her clit, the other on her breast", tags: "female masturbation, solo, fingering, pussy" },
+  { match: /\bmasturbat\w*\b|\btouching (herself|her pussy)\b|\bplaying with (herself|her pussy)\b|\bpleasuring herself\b|\bjilling\b/i, means: ["alone, no partner: she lies back on a bed, legs apart, one hand between her legs rubbing her clit, the other on her breast", "alone, no partner: she sits in an armchair with one leg hooked over the armrest, her fingers inside her pussy", "alone, no partner: she stands in the shower, one hand between her legs, the other braced against the tiles", "alone, no partner: she kneels upright on the bed, knees apart, one hand between her thighs, head tilted back", "alone, no partner: she lies on her stomach with one hand underneath her between her legs, hips raised a little"], tags: "female masturbation, solo, fingering, pussy" },
   { match: /\bfinger(ing|s|ed)? (herself|her own pussy|her pussy)\b|\bfinger(ing|s)? her (wet |own )?(cunt|clit)\b/i, means: "alone, no partner: her own fingers pushed inside her own pussy, her hand between her thighs", tags: "female masturbation, fingering, solo, pussy, spread legs" },
   { match: /\bfinger(ing|ed)\b(?! (herself|her own|her pussy|her clit))|\bgets? fingered\b/i, means: "someone else's fingers pushed inside her pussy; show whose hand it is", tags: "fingering, pussy" },
   { match: /\b(rubbing|rubs|playing with|touching) (her|her own) clit\b/i, means: "her fingertips rubbing her clit in circles, her pussy lips parted", tags: "clitoral stimulation, female masturbation, solo, pussy" },
@@ -74,11 +75,14 @@ export const sexTerms = [
   { match: /\bgrinding on\b|\bdry ?humping\b|\blap ?dance\b/i, ambiguous: true, means: "she straddles him and grinds her hips on his lap", tags: "straddling, grinding, lap dance" }
 ];
 
-/** The entries an idea uses: an ambiguous term only when the idea is sexual anyway. */
+/** The entries an idea uses: an ambiguous term only when the idea is sexual anyway, a general one only when no other term names the position. */
 export function sexTermsIn(text = "") {
   const idea = String(text);
   const isSexual = sexual.test(idea);
-  return sexTerms.filter((term) => term.match.test(idea) && (!term.ambiguous || isSexual));
+  // "Fucking herself with a dildo" is solo: the general partnered positions stay out of it.
+  const solo = /\b(herself|himself|dildo|vibrator|sex toy|alone|solo)\b/i.test(idea);
+  const found = sexTerms.filter((term) => term.match.test(idea) && (!term.ambiguous || isSexual) && !(term.general && solo));
+  return found.some((term) => !term.general) ? found.filter((term) => !term.general) : found;
 }
 
 // Words that bring a second person (or the viewer, in POV) into the idea. Without one, an act that takes a
@@ -90,12 +94,19 @@ export function partnerMissing(text = "") {
   return sexTermsIn(text).some((term) => /\bhetero\b/.test(term.tags)) && !anotherPerson.test(String(text));
 }
 
+// One of several poses, picked by the request's roll, so a basic act doesn't always come out one way.
+function pick(list, roll, salt) {
+  let x = (Math.floor(Math.abs(roll)) ^ Math.imul(salt + 7, 0x9e3779b1)) >>> 0;
+  x = Math.imul(x ^ (x >>> 16), 0x45d9f3b) >>> 0;
+  return list[((x ^ (x >>> 16)) >>> 0) % list.length];
+}
+
 /** The lines that go into the system prompt, or "" when the idea uses no such term. */
-export function sexTermNotes(text = "", { tags = false } = {}) {
+export function sexTermNotes(text = "", { tags = false, roll = 0 } = {}) {
   const found = sexTermsIn(text);
   if (!found.length) return "";
   const name = (term) => (String(text).match(term.match)?.[0] || "").toLowerCase();
-  const lines = found.map((term) => `- "${name(term)}": ${term.means}${tags ? `. Tags: ${term.tags}` : ""}.`);
+  const lines = found.map((term, index) => `- "${name(term)}": ${Array.isArray(term.means) ? pick(term.means, roll, index) : term.means}${tags ? `. Tags: ${term.tags}` : ""}.`);
   const partner = partnerMissing(text)
     ? `\nThe idea names only her, but this takes a partner: add a man to the picture, and the cock in it is his.${tags ? " Tag him (1boy, hetero)." : ""}`
     : "";
