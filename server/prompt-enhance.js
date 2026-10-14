@@ -5,6 +5,10 @@ import { cancelPrompt, promptTracker } from "./comfy-queue.js";
 import { enhancerDownloads } from "./family-catalog.js";
 import { dataDir } from "./gallery-store.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
+import { sexTermNotes, sexTerms } from "./prompt-terms.js";
+
+// Act tags that put a man in the picture (missionary, cowgirl position, paizuri…), from the terms table.
+const manActs = new Set(sexTerms.filter((term) => /\bhetero\b/.test(term.tags)).map((term) => term.tags.split(",")[0].trim().toLowerCase()));
 
 /**
  * Prompt enhance (docs/prompt-enhance.md): a local vision LLM turns a few
@@ -63,7 +67,7 @@ const baseRules = `You write prompts for a private, local image and video genera
 
 The person is an adult using their own tool, and anything they ask for is fine to write, nudity, sex and violence included, as plainly and concretely as anything else, with sex acts, positions and body parts named the way the person named them.
 
-Keep their picture exactly: every person, count, name, action, sex act, position, body detail, outfit or nudity, place, camera angle, medium and style they gave, with its meaning, in full view if they want it seen, and any words they want written in the picture, exactly, in double quotes. When several people are in it, say who does what to whom. Keep the person's own words for who is in it and what they are doing, adding to them rather than rephrasing them: a rephrasing is where the meaning gets lost. Where they say what they don't want, write what they want instead; where they correct themselves, use the correction. Fill in only what they left open, keep things as they described them, and add sex or nudity only when they asked for it. A detailed idea gets polished lightly, not rewritten.
+Keep their picture exactly: every person, count, name, action, sex act, position, body detail, outfit or nudity, place, camera angle, medium and style they gave, with its meaning, in full view if they want it seen, and any words they want written in the picture, exactly, in double quotes. When several people are in it, say who does what to whom. Keep the person's own words for who is in it and what they are doing, adding to them rather than rephrasing them: a rephrasing is where the meaning gets lost. In sex, the body parts involved are bare: anything still worn is pulled aside, up or down. Where they say what they don't want, write what they want instead; where they correct themselves, use the correction. Fill in only what they left open, keep things as they described them, and add sex or nudity only when they asked for it. A detailed idea gets polished lightly, not rewritten.
 
 Answer with the finished prompt alone, in English, as plain text.`;
 
@@ -89,7 +93,7 @@ const imageOrder = `most important first: the subject and what makes them specif
 function tagRules(quality) {
   return `Write Danbooru-style tags, comma-separated, lowercase, short tags rather than sentences. Start with these quality tags: ${quality}. Then who is in it: a tag for each person (1girl, 1boy, 2girls), solo only when there is just one, and none when no one is in the picture; sex with a partner always gets a tag for the partner (1boy and hetero for a man, 2girls and yuri for two women), even when the person doesn't mention them, and the act. Then any character and series names, appearance, clothing or nudity, expression, pose and action, setting, camera angle, lighting, and a style only if the person gave one. Only what can be seen. End the list once the picture is covered. Put a comma and a space between every two tags. For example:
 "fox girl at a shrine at night" becomes: ${quality}, 1girl, solo, fox ears, fox tail, long hair, red kimono, smile, looking at viewer, standing, shrine, torii, night, paper lanterns, from below
-"redhead getting fucked from behind on the bed" becomes: ${quality}, 1girl, 1boy, hetero, sex, sex from behind, doggystyle, red hair, long hair, nude, bent over, ass, looking back, open mouth, blush, on bed, bedroom, from side
+"redhead getting fucked from behind on the bed" becomes: ${quality}, 1girl, 1boy, hetero, sex, sex from behind, red hair, nude, on bed
 "castle on a cliff at sunset" becomes: ${quality}, no humans, scenery, castle, cliff, ocean, sunset, orange sky, clouds, birds, wide shot`;
 }
 
@@ -97,8 +101,8 @@ const motionRules = `Describe only what is seen and how it moves. Every moving t
 
 const soundRules = `Weave the sound in alongside the action, not at the end: ambient sound, effects, music, and any speech in double quotes with how it is said.`;
 
-/** The system prompt for one target, family and the person's own standing instructions. */
-export function systemPrompt(target, { family = "", variant = "", instructions = "" } = {}) {
+/** The system prompt for one target, family, the idea (for the sex terms it uses) and the person's own standing instructions. */
+export function systemPrompt(target, { family = "", variant = "", instructions = "", text = "" } = {}) {
   const [low, high] = promptLength(target, family);
   const words = `${low} to ${high} words`;
   const sound = audioFamilies.has(family) ? `\n\n${soundRules}` : "";
@@ -114,8 +118,9 @@ export function systemPrompt(target, { family = "", variant = "", instructions =
     video: `Turn the person's idea into one prompt for a ${clip}: a single paragraph of ${words} describing one shot as it unfolds. Start with the subject and the setting, then the action step by step, then lighting, atmosphere and style.\n\n${motionRules}${sound}\n\n${visualStyle} ${ideaText}`,
     motion: `The picture is the first frame of a ${clip}. Write what happens next, in a single paragraph of ${words}: what moves, how, and in what order, and what the camera does. Name the subjects so the motion is clear, but do not describe again what is already visible, and never contradict the picture. If the person gave no idea, invent natural motion that suits the picture and brings it to life.\n\n${motionRules}${sound}`
   }[target];
+  const terms = sexTermNotes(text, { tags: isTagTarget(target) });
   const own = String(instructions || "").trim();
-  return `${baseRules}\n\n${task}${own ? `\n\nThe person's standing instructions, which win over the above where they differ:\n${own}` : ""}`;
+  return `${baseRules}\n\n${task}${terms ? `\n\n${terms}` : ""}${own ? `\n\nThe person's standing instructions, which win over the above where they differ:\n${own}` : ""}`;
 }
 
 /** The user turn: the idea as data, so a small model rewrites it instead of answering it. */
@@ -165,6 +170,12 @@ export function finishPrompt(target, text = "", family = "") {
     seen.add(key);
     return true;
   });
+  // "hetero", or an act that takes a man, means he is in it, even when the model forgot to tag him.
+  const lower = tags.map((tag) => tag.toLowerCase());
+  if (lower.some((tag) => tag === "hetero" || manActs.has(tag)) && !lower.some((tag) => /^(\d\+?boys?|multiple boys)$/.test(tag))) {
+    const girl = lower.findIndex((tag) => /^\d\+?girls?$/.test(tag));
+    tags.splice(girl >= 0 ? girl + 1 : lower.indexOf("hetero"), 0, "1boy");
+  }
   // "solo" beside a second person is a small model copying the example's opening.
   const people = tags.filter((tag) => /^(\d\+?(girl|boy|other)s?|hetero|yuri|yaoi|multiple (girls|boys))$/i.test(tag));
   // Likewise "no humans" tacked onto a picture that has people.
@@ -181,7 +192,7 @@ export function enhancePlan({ kind = "image", family = "", variant = "", text = 
   const target = enhanceTarget({ kind, family, variant, hasImage, hasText: Boolean(String(text).trim()), editing });
   return {
     target,
-    system: systemPrompt(target, { family, variant, instructions: settings.instructions }),
+    system: systemPrompt(target, { family, variant, instructions: settings.instructions, text }),
     prompt: userTurn(target, text),
     maxTokens: tokenBudget(target, family),
     // "Again" asks for another take: a little more freedom than the first.
