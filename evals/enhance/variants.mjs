@@ -69,6 +69,17 @@ export const variants = {
     return { ...plan, system: parts.join("\n\n"), prompt: `${plan.prompt}\n\nFor this picture, wherever the idea doesn't say otherwise: ${framing}, ${light}, and any person in it has ${hair}, ${expression}.` };
   },
 
+  // An idea that is itself an artwork (abstract, a painting, a color field): the whole picture is the artwork, not
+  // a photo of a painting on a wall. Eval-only prototype: the roll and the subject-first wording step aside.
+  "art-frame": (plan, { item } = {}) => {
+    const idea = String(item?.prompt || "");
+    if (!/\b(abstract|color field|colour field|painting|watercolou?r|ink wash|pattern|texture study|non-representational)\b/i.test(idea)) return plan;
+    const parts = plan.system.split("\n\n").filter((part) => !part.startsWith("Where the idea leaves them open"));
+    const system = parts.join("\n\n").replace(/Start with the subject and what makes them specific \([^)]*\) and what they are doing, then the setting\./,
+      "The idea is an artwork itself: describe the artwork filling the whole picture edge to edge, its colours, marks, layers, texture and composition, with no room, wall, frame, table or camera around it.");
+    return { ...plan, system };
+  },
+
   // Sampling.
   "temp-0.55": (plan) => ({ ...plan, temperature: 0.55 }),
   "temp-0.85": (plan) => ({ ...plan, temperature: 0.85 })

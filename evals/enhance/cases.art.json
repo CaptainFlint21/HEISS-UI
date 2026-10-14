@@ -1,0 +1,10 @@
+{
+  "about": "Abstract and painterly ideas with no subject or camera: does the enhancer keep it an art piece?",
+  "families": { "krea2": { "label": "Krea 2", "family": "krea2", "variant": "turbo" }, "qwen21": { "label": "Qwen-Image 2.1", "family": "qwen_image_21", "variant": "standard" }, "flux1": { "label": "Flux.1 Dev", "family": "flux1", "variant": "dev" } },
+  "shared": [
+    { "id": "art-monet", "nsfw": false, "shape": "one", "prompt": "beautiful abstract painting in monet style, no clear subject, just color and light" },
+    { "id": "art-rothko", "nsfw": false, "shape": "tiny", "prompt": "rothko-like color field painting" },
+    { "id": "art-ink", "nsfw": false, "shape": "two", "prompt": "Abstract ink and watercolor on wet paper. Indigo bleeding into gold, no shapes, pure texture." }
+  ],
+  "own": {}
+}
