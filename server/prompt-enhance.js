@@ -92,7 +92,7 @@ const seenText = `Words visible in the picture go in double quotes, with where a
 const visualStyle = `Describe concretely and visually: materials, textures, small believable details, how light falls on surfaces. Leave out empty praise and quality tags such as "masterpiece", "8K" or "best quality".`;
 
 // From an idea: their picture first, then only what they left open, in one consistent look.
-const imageFill = `Start with the subject and what they are doing, then the setting. Then fill in what the picture still needs: framing and camera angle, the light and where it comes from, and the medium. Keep the look they asked for and make the camera, light and medium agree with it and with each other; a painting or drawing gets no camera terms. When no medium is given, choose the one that suits the idea best, a photograph for anything real.`;
+const imageFill = `Start with the subject and what makes them specific (build, hair, skin, face, expression, what they wear or that they are naked) and what they are doing, then the setting. Then fill in what the picture still needs: framing and camera angle, the light and where it comes from, and the medium. Keep the look they asked for and make the camera, light and medium agree with it and with each other; a painting or drawing gets no camera terms. When no medium is given, choose the one that suits the idea best, a photograph for anything real.`;
 
 // One worked example shows a small model the register better than more rules do: their picture kept, the
 // gaps filled to fit one look, the sound quietly gone, nothing about what isn't there. Its subject is
@@ -146,7 +146,7 @@ export function systemPrompt(target, { family = "", variant = "", instructions =
   const clip = audioFamilies.has(family) ? "video with sound" : "silent video";
   const quality = tagStyle(family, variant) || tagVariants.anime;
   const task = {
-    image: `Turn the person's idea into one image prompt: ${words} of plain, concrete sentences about what the camera sees. ${imageFill}\n\n${visualStyle}\n\n${imageExample}${rollFor(text, roll) ? `\n\n${rollFor(text, roll)}` : ""}`,
+    image: `Turn the person's idea into one image prompt: ${words} of short, plain sentences about what the camera sees, one or two facts each. ${imageFill}\n\n${visualStyle}\n\n${imageExample}${rollFor(text, roll) ? `\n\n${rollFor(text, roll)}` : ""}`,
     tags: `Turn the person's idea into an image prompt for an anime model. ${tagRules(quality)}\n\nUse ${low} to ${high} tags.`,
     describe: `Look at the picture and write the prompt that would make it again: a single flowing paragraph of ${words} in natural sentences, ${imageOrder}\n\nDescribe only what is there, and name the medium and style exactly. Describe people's visible appearance, clothing or nudity, and pose plainly and accurately. If the person adds words, they say what to focus on or change.\n\n${visualStyle} ${seenText}`,
     "tags-describe": `Look at the picture and write the tags that would make it again with an anime model. ${tagRules(quality)}\n\nUse ${low} to ${high} tags; describe only what is there.`,
