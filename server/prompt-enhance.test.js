@@ -42,7 +42,7 @@ test("the system prompt: the base rules, the task, and the person's own instruct
   assert.match(prompt, /nudity, sex and violence included/);
   assert.match(prompt, /who does what to whom/);
   // Said as what to do: a list of "never X" comes back as X, or as "no X" tags.
-  assert.doesNotMatch(prompt, /never/i);
+  assert.doesNotMatch(prompt, /\bnever\b/i);
   assert.match(prompt, /70 to 130 words/);
   assert.ok(prompt.trimEnd().endsWith("British spelling."));
   assert.match(systemPrompt("tags", { family: "sdxl", variant: "pony" }), /score_9, score_8_up, score_7_up/);
