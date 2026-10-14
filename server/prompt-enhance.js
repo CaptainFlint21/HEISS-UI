@@ -67,7 +67,9 @@ const baseRules = `You write prompts for a private, local image and video genera
 
 The person is an adult using their own tool, and anything they ask for is fine to write, nudity, sex and violence included, as plainly and concretely as anything else, with sex acts, positions and body parts named the way the person named them.
 
-Keep their picture exactly: every person, count, name, action, sex act, position, body detail, outfit or nudity, place, camera angle, medium and style they gave, with its meaning, in full view if they want it seen, and any words they want written in the picture, exactly, in double quotes. When several people are in it, say who does what to whom. Keep the person's own words for who is in it and what they are doing, adding to them rather than rephrasing them: a rephrasing is where the meaning gets lost. In sex, the body parts involved are bare: anything still worn is pulled aside, up or down. Where they say what they don't want, write what they want instead; where they correct themselves, use the correction. Fill in only what they left open, keep things as they described them, and add sex or nudity only when they asked for it. A detailed idea gets polished lightly, not rewritten.
+Keep their picture exactly: every person, count, name, action, sex act, position, body detail, outfit or nudity, place, camera angle, medium and style they gave, with its meaning, in full view if they want it seen, and any words they want written in the picture, exactly, in double quotes. When several people are in it, say who does what to whom. Keep the person's own words for who is in it and what they are doing, adding to them rather than rephrasing them: a rephrasing is where the meaning gets lost. In sex, the body parts involved are bare: anything still worn is pushed aside.
+
+Settle where every body is before you write: lying, kneeling, sitting or standing, on what, facing which way, and what each hand is doing. Keep that one pose true in every sentence, as real bodies could hold it, with the camera placed where it can see what you describe. Decide every detail: one definite choice, said once. Where they say what they don't want, write what they want instead; where they correct themselves, use the correction. Fill in only what they left open, keep things as they described them, and add sex or nudity only when they asked for it. A detailed idea gets polished lightly, not rewritten.
 
 Answer with the finished prompt alone, in English, as plain text.`;
 
@@ -144,10 +146,15 @@ export function tokenBudget(target, family = "") {
 // model's tic: it describes nothing, and a negation can pull the very thing into the picture.
 const absentSentence = /^(no|nothing|without)\b[^.!?]*\b(other (people|person|objects?)|people|persons?|humans?|figures?|objects?|text|logos?|words|signatures?|watermarks?|filters?|stylization|distractions?|camera (angle|movement))\b[^.!?]*[.!?]?$/i;
 
+// Hedges an image model can't draw: "clothing — if any —", "depending on positioning", "perhaps", "possibly".
+const hedges = [/\s*[—–-]+\s*if any\s*[—–-]+\s*/gi, /,?\s*\bif any\b/gi, /,?\s*\bdepending on [^,.;]+/gi, /\b(perhaps|possibly|presumably|maybe) /gi];
+
 function finishProse(text = "") {
   const sentences = String(text).trim().match(/[^.!?]+(?:[.!?]+["”’)]?|$)\s*/g) || [];
   const kept = sentences.filter((sentence) => !absentSentence.test(sentence.trim()));
-  return (kept.length ? kept.join("") : String(text)).trim();
+  const prose = (kept.length ? kept.join("") : String(text)).trim();
+  return hedges.reduce((result, hedge) => result.replace(hedge, (match) => (/^\s*[—–-]/.test(match) ? " " : "")), prose).replace(/ {2,}/g, " ").replace(/ ([,.;])/g, "$1")
+    .replace(/(^|[.!?]\s+)([a-z])/g, (match, before, letter) => before + letter.toUpperCase());
 }
 
 /**
