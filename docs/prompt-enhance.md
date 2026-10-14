@@ -19,6 +19,16 @@ What the composer holds decides the task (`enhanceTarget` in `server/prompt-enha
 
 Length follows the model: about 30–60 words for CLIP-based SDXL and SD 1.5, 70–130 for most models, and 100–200 for the long LLM encoders (Qwen-Image, Flux.2, Krea 2, LTX). The rules come from the model makers' own prompt rewriters (Qwen-Image, FLUX.2, Wan 2.2, LTX-2, Z-Image), shortened for a 4B model: keep every subject, count, name and quoted text; never answer the idea, only rewrite it; output the prompt alone.
 
+How the system prompt is written follows what a 4B model actually does with it (`evals/enhance/FINDINGS.md`):
+- **The person's picture comes first and stays theirs:** who does what to whom, in their own words; then only the gaps are filled, in one consistent look. A list of every slot to fill made every prompt the same ("low angle, shallow depth of field, 35mm film").
+- **Rules say what to do.** A small model turns "never X" into X, or into `no_x` tags, so the system prompt has no lists of what to avoid.
+- **One worked example per task** carries the register better than more rules.
+- **Sex terms are looked up, not guessed** (`server/prompt-terms.js`). A 4B model knows the words but not the positions ("missionary" came back as a missionary in a long dress). The terms an idea uses, and only those, go into its system prompt with their plain meaning and Danbooru tags. Everyday senses (a cowgirl on a horse, a spa facial) only count in a sexual idea.
+- **A short idea gets a roll for what it leaves open:** a framing, a light, and, for a person it doesn't describe, a hair and an expression. Basic acts with several natural poses (masturbation, a blowjob, plain "having sex" with no position named) roll one. Left alone, a 4B model writes its single likeliest version every time: "portrait of a woman" came back as the same centered, dark-haired, neutral woman in 4 of 4 takes, and Try again changed nothing. Anything the idea says wins over the roll, and an idea over 40 words gets none, since it has made its own choices. The app rolls randomly; the eval rolls from the seed.
+- **`finishPrompt` cleans up what the model still does:** negative and sentence-length tags, "solo" beside a second person, a missing 1boy when an act takes a man; in prose, sentences that only say what's absent, "X or Y" hedges about one thing (the first stays), and the "no filters or stylization" sign-off.
+
+`evals/enhance` runs base prompts through this exact code (`enhancePlan` → `runEnhance` → `finishPrompt`) with timing for each run, for reading against reference prompts. A detailed idea longer than the usual word range keeps its room: the range and token budget grow to its length.
+
 Settings › Features › Prompt enhance sets the model, the style (Faithful, Balanced, Bold; the sampling temperature), and standing instructions added to every request.
 
 ## The models
@@ -28,7 +38,7 @@ All three are uncensored (abliterated or Heretic) builds in ComfyUI's single-fil
 | Model | Size | On an RTX 3070 (8 GB) |
 |---|---|---|
 | Qwen3-VL 4B, huihui abliterated, INT8 ConvRot (default) | 5.1 GB | First words in about 1.5 s; a full prompt in 3–5 s once loaded, about 9 s from cold. |
-| Qwen3.5 4B, HauhauCS uncensored, INT8 ConvRot | 5.5 GB | The best writing, but too large to stay whole on an 8 GB card next to `--reserve-vram`: about 6 tokens/s there. Wants 10 GB or more. |
+| Qwen3.5 4B, HauhauCS uncensored, INT8 ConvRot | 5.5 GB | Reads actions best (who does what), but copies the tag examples more readily, and its first words take about 2.7 s. 25–37 tokens/s when the card has the room; when other programs hold VRAM it streams its weights and drops to about 6. |
 | Qwen3.5 2B, Heretic, INT8 ConvRot | 3.1 GB | About 50 tokens/s. Simpler wording, and weaker at reading pictures. |
 
 The model has to fit in VRAM whole. If it doesn't, ComfyUI's dynamic VRAM streams the weights in for every token and speed collapses, which is why fp8 files are left out: on cards before Ada, ComfyUI upcasts fp8 to 16-bit (the fp8 Qwen3-VL-4B loads as 8.4 GB). INT8 ConvRot stays INT8.

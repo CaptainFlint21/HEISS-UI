@@ -61,7 +61,7 @@ import { applyLoraOps, clearLoraState, loadLoraLibrary, loadLoraStack, saveLoraL
 import { inpaintInputNames, prepareInpaint } from './inpaint.js';
 import { bytesForReference, deleteUploadedReference, listReferenceAssets, readMultipartImage, readUploadedReference, referenceAssetFromGallery, saveUploadedReference, stageReferenceAssets, uploadBufferToComfy } from './reference-assets.js';
 import { prepareInputImage } from './input-image-sizing.js';
-import { enhanceModel, enhanceTarget, enhancerChoices, finishPrompt, loadEnhanceSettings, runEnhance, saveEnhanceSettings, systemPrompt, tokenBudget, userTurn } from './prompt-enhance.js';
+import { enhanceModel, enhancePlan, enhancerChoices, finishPrompt, loadEnhanceSettings, runEnhance, saveEnhanceSettings } from './prompt-enhance.js';
 import { nodePack, nodePacks } from './node-packs.js';
 import { beginComfyRestart, comfyRestartStartedAt, comfyRestarting, finishComfyRestart, lastComfyRestart, noteComfyRestart } from './comfy-restart.js';
 import { failedPacks, loadedPacks, logTextFromRaw, packLabel, restartChanges } from './restart-insights.js';
@@ -1975,7 +1975,8 @@ app.post("/api/enhance", async (req, res) => {
   const family = String(body.family || "").slice(0, 64);
   const variant = String(body.variant || "").slice(0, 64);
   const text = String(body.prompt || "").slice(0, 4000);
-  const target = enhanceTarget({ kind, family, variant, hasImage: Boolean(assetId), hasText: Boolean(text.trim()), editing: Boolean(body.editing) });
+  const plan = enhancePlan({ kind, family, variant, text, hasImage: Boolean(assetId), editing: Boolean(body.editing), again: Boolean(body.again) }, status.settings);
+  const { target } = plan;
   let staged = null;
   if (assetId) {
     try {
@@ -1992,17 +1993,14 @@ app.post("/api/enhance", async (req, res) => {
   const stop = new AbortController();
   res.on("close", () => { if (!res.writableFinished) stop.abort(); });
   send({ type: "start", target });
-  const { settings } = status;
-  // "Again" asks for another take: a little more freedom than the first.
-  const temperature = Math.min(1.2, settings.creativity + (body.again ? 0.15 : 0));
   try {
     await runEnhance({
       model: status.model,
-      system: systemPrompt(target, { family, variant, instructions: settings.instructions }),
-      prompt: userTurn(target, text),
+      system: plan.system,
+      prompt: plan.prompt,
       image: staged?.comfyName || "",
-      maxTokens: tokenBudget(target, family),
-      temperature,
+      maxTokens: plan.maxTokens,
+      temperature: plan.temperature,
       seed: crypto.randomInt(0, 2 ** 31)
     }, {
       signal: stop.signal,

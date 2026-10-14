@@ -1,0 +1,19 @@
+{
+  "about": "Sex-act vocabulary probe: does the enhancer read common act terms right (who does what to whom, in which position)? Half the terms appear nowhere in cases.json.",
+  "families": { "krea2": { "label": "Krea 2", "family": "krea2", "variant": "turbo" }, "pony": { "label": "Pony", "family": "sdxl", "variant": "pony" } },
+  "shared": [
+    { "id": "a-cowgirl", "nsfw": true, "shape": "one", "prompt": "redhead riding him cowgirl on the couch" },
+    { "id": "a-reverse-cowgirl", "nsfw": true, "shape": "one", "prompt": "reverse cowgirl, shes facing away from him, ass to the camera" },
+    { "id": "a-mating-press", "nsfw": true, "shape": "one", "prompt": "mating press, blonde on her back with him on top pinning her legs back" },
+    { "id": "a-69", "nsfw": true, "shape": "tiny", "prompt": "69 on a hotel bed" },
+    { "id": "a-facesitting", "nsfw": true, "shape": "tiny", "prompt": "brunette facesitting him" },
+    { "id": "a-titfuck", "nsfw": true, "shape": "tiny", "prompt": "titfuck with oiled tits" },
+    { "id": "a-footjob", "nsfw": true, "shape": "one", "prompt": "footjob on the sofa, her feet wrapped around his cock" },
+    { "id": "a-handjob", "nsfw": true, "shape": "one", "prompt": "girl giving a handjob in a dark cinema" },
+    { "id": "a-spitroast", "nsfw": true, "shape": "one", "prompt": "two guys spitroasting a girl on a kitchen table" },
+    { "id": "a-missionary", "nsfw": true, "shape": "one", "prompt": "missionary on a sofa, her legs wrapped around him" },
+    { "id": "a-pov-bj", "nsfw": true, "shape": "one", "prompt": "pov blowjob, she's kneeling in the shower looking up" },
+    { "id": "a-doggy-mirror", "nsfw": true, "shape": "one", "prompt": "doggystyle in front of a mirror, he's pulling her hair" }
+  ],
+  "own": {}
+}

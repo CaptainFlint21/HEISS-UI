@@ -1,0 +1,12 @@
+{
+  "about": "Fidelity probe for sampling settings: who-does-what cases, run with --repeat. Mixes eval and held-out prompts.",
+  "families": { "krea2": { "label": "Krea 2", "family": "krea2", "variant": "turbo" }, "qwen21": { "label": "Qwen-Image 2.1", "family": "qwen_image_21", "variant": "standard" } },
+  "shared": [
+    { "id": "motel", "nsfw": true, "shape": "one", "prompt": "thick latina getting fucked missionary on a cheap motel bed, legs up by her head, cum dripping out of her pussy, shot from above" },
+    { "id": "milf-dildo", "nsfw": true, "shape": "tiny", "prompt": "milf riding dildo selfie" },
+    { "id": "h-car-backseat", "nsfw": true, "shape": "one", "prompt": "brunette giving a handjob in the back seat of a car at night, dashboard glow, his cock in her fist, shot on phone" },
+    { "id": "h-threesome", "nsfw": true, "shape": "two", "prompt": "two guys spitroasting a blonde on a couch, one in her mouth one fucking her from behind. living room, tv on, amateur video still" },
+    { "id": "grandma-kitchen", "nsfw": false, "shape": "ramble", "prompt": "ok so I want like my grandmas kitchen but in the 70s you know with the orange tiles and stuff and theres a cat on the counter, a fat orange one, and sun coming in the window kinda dusty, uh and maybe a radio and a cake cooling, actually make it a pie, cherry pie, and it should look like an old photo, like a faded polaroid but not too faded you know" }
+  ],
+  "own": {}
+}

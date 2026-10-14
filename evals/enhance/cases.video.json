@@ -1,0 +1,9 @@
+{
+  "about": "Sanity check that the shared rules still suit video (run.mjs --kind video --file cases.video.json). Not tuned on.",
+  "families": { "ltx": { "label": "LTX-2", "family": "ltx", "variant": "" }, "wan": { "label": "Wan 2.2", "family": "wan22_14b", "variant": "" } },
+  "shared": [
+    { "id": "v-street-musician", "nsfw": false, "shape": "one", "prompt": "street musician playing saxophone in the rain at night, people walking past" },
+    { "id": "v-strip", "nsfw": true, "shape": "two", "prompt": "Woman slowly taking off her bra in a hotel room, looking at the camera. She says \"come here\" and smiles." }
+  ],
+  "own": {}
+}

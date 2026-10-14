@@ -1,0 +1,18 @@
+{
+  "about": "NSFW edge cases: acts where nobody else is named, cocks that belong to the woman (tgirl, futa), two-women scenes, toys that aren't partners, more people than usual. Never tuned on before this probe.",
+  "families": { "krea2": { "label": "Krea 2", "family": "krea2", "variant": "turbo" }, "qwen21": { "label": "Qwen-Image 2.1", "family": "qwen_image_21", "variant": "standard" }, "pony": { "label": "Pony", "family": "sdxl", "variant": "pony" } },
+  "shared": [
+    { "id": "e-handjob-cinema", "nsfw": true, "shape": "one", "prompt": "girl giving a handjob in a dark cinema" },
+    { "id": "e-head-car", "nsfw": true, "shape": "one", "prompt": "blonde giving head in a parked car at night" },
+    { "id": "e-titjob-shower", "nsfw": true, "shape": "tiny", "prompt": "titjob in the shower" },
+    { "id": "e-railed-balcony", "nsfw": true, "shape": "one", "prompt": "redhead getting railed on a hotel balcony" },
+    { "id": "e-tgirl-handjob", "nsfw": true, "shape": "one", "prompt": "tgirl getting a handjob from her boyfriend on the bed" },
+    { "id": "e-futa-behind", "nsfw": true, "shape": "one", "prompt": "futa fucking a girl from behind in a locker room" },
+    { "id": "e-double-bj", "nsfw": true, "shape": "one", "prompt": "two girls sharing one cock, double blowjob, pov" },
+    { "id": "e-lesbian-licking", "nsfw": true, "shape": "one", "prompt": "girl licking her girlfriends pussy on the couch" },
+    { "id": "e-two-handjobs", "nsfw": true, "shape": "one", "prompt": "girl jerking off two guys at once in a bathroom" },
+    { "id": "e-dildo-suck", "nsfw": true, "shape": "one", "prompt": "girl sucking a dildo on her bed, selfie" },
+    { "id": "e-footjob-table", "nsfw": true, "shape": "two", "prompt": "Milf giving her younger boyfriend a footjob under the dinner table. Fancy restaurant, nobody notices." }
+  ],
+  "own": {}
+}

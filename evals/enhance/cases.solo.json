@@ -1,0 +1,16 @@
+{
+  "about": "Solo NSFW probe: one person, her own hands or a toy, plus one partnered fingering case. Wording not used to write prompt-terms.js.",
+  "families": { "krea2": { "label": "Krea 2", "family": "krea2", "variant": "turbo" }, "qwen21": { "label": "Qwen-Image 2.1", "family": "qwen_image_21", "variant": "standard" }, "pony": { "label": "Pony", "family": "sdxl", "variant": "pony" } },
+  "shared": [
+    { "id": "s-finger-couch", "nsfw": true, "shape": "one", "prompt": "blonde fingering herself on the couch, legs spread" },
+    { "id": "s-bathtub", "nsfw": true, "shape": "tiny", "prompt": "girl masturbating in the bathtub, steam" },
+    { "id": "s-dildo-floor", "nsfw": true, "shape": "one", "prompt": "redhead riding a dildo on the kitchen floor, phone selfie" },
+    { "id": "s-wand", "nsfw": true, "shape": "one", "prompt": "brunette with a magic wand on her clit, eyes rolled back, on her bed" },
+    { "id": "s-spread", "nsfw": true, "shape": "tiny", "prompt": "spreading her pussy for the camera, close up" },
+    { "id": "s-presenting", "nsfw": true, "shape": "one", "prompt": "bent over the bed presenting her ass and pussy, looking back at the camera" },
+    { "id": "s-mirror-tits", "nsfw": true, "shape": "tiny", "prompt": "nude mirror selfie grabbing her tits" },
+    { "id": "s-flash-train", "nsfw": true, "shape": "one", "prompt": "flashing her tits on a busy train platform, candid" },
+    { "id": "s-bf-fingering", "nsfw": true, "shape": "one", "prompt": "her bf fingering her in the passenger seat at night" }
+  ],
+  "own": {}
+}

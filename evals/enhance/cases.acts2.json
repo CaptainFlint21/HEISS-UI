@@ -1,0 +1,15 @@
+{
+  "about": "Second sex-act probe, held out: different wording and scenes from cases.acts.json, never tuned on.",
+  "families": { "krea2": { "label": "Krea 2", "family": "krea2", "variant": "turbo" }, "qwen21": { "label": "Qwen-Image 2.1", "family": "qwen_image_21", "variant": "standard" }, "pony": { "label": "Pony", "family": "sdxl", "variant": "pony" } },
+  "shared": [
+    { "id": "b-eating-out", "nsfw": true, "shape": "one", "prompt": "hes eating her out on the kitchen counter, her legs over his shoulders" },
+    { "id": "b-jerk-restaurant", "nsfw": true, "shape": "one", "prompt": "jerking him off under the table at a fancy restaurant" },
+    { "id": "b-prone-dorm", "nsfw": true, "shape": "one", "prompt": "blonde getting railed prone bone in a messy dorm room" },
+    { "id": "b-scissoring", "nsfw": true, "shape": "tiny", "prompt": "two naked girls scissoring on a yoga mat" },
+    { "id": "b-pegging", "nsfw": true, "shape": "one", "prompt": "girlfriend pegging her boyfriend with a pink strap-on" },
+    { "id": "b-facial", "nsfw": true, "shape": "two", "prompt": "Facial after a blowjob in a club bathroom. She's smiling, cum on her face." },
+    { "id": "b-dp-couch", "nsfw": true, "shape": "one", "prompt": "double penetration on a leather couch, two guys and a redhead" },
+    { "id": "b-handjob-car", "nsfw": true, "shape": "one", "prompt": "brunette giving a handjob in the back seat of a car at night, dashboard glow, his cock in her fist, shot on phone" }
+  ],
+  "own": {}
+}

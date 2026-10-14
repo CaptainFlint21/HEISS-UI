@@ -1,0 +1,60 @@
+{
+  "about": "Base prompts for the prompt-enhance eval (README.md, RUBRIC.md), written the way people type. shape: tiny = five words or fewer, one = one sentence, two = two sentences, ramble = long voice-mode input with filler, self-corrections and non-visual asides the enhancer must drop. ref = the Civitai reference entry it was backed out of. Every character is an adult.",
+  "families": {
+    "krea2": { "label": "Krea 2", "family": "krea2", "variant": "turbo", "reference": "Krea 2" },
+    "sdxl": { "label": "SDXL 1.0", "family": "sdxl", "variant": "standard", "reference": "SDXL 1.0" },
+    "pony": { "label": "Pony", "family": "sdxl", "variant": "pony", "reference": "Pony" },
+    "flux1": { "label": "Flux.1 Dev", "family": "flux1", "variant": "dev", "reference": "Flux.1 D" },
+    "qwen21": { "label": "Qwen-Image 2.1", "family": "qwen_image_21", "variant": "standard", "reference": "Qwen 2.1" }
+  },
+  "shared": [
+    { "id": "lighthouse", "nsfw": false, "shape": "tiny", "prompt": "lighthouse in a storm painting" },
+    { "id": "milf-dildo", "nsfw": true, "shape": "tiny", "prompt": "milf riding dildo selfie" },
+    { "id": "office", "nsfw": true, "shape": "two", "trap": "negation", "prompt": "office meeting room, boss standing there in his suit and the secretary is topless on a stool, kinda shy but showing her tits off for him. skirt pulled up no panties, dont make her look slutty she should look nervous" },
+    { "id": "motel", "nsfw": true, "shape": "one", "prompt": "thick latina getting fucked missionary on a cheap motel bed, legs up by her head, cum dripping out of her pussy, shot from above" },
+    { "id": "grandma-kitchen", "nsfw": false, "shape": "ramble", "trap": "self-correction", "prompt": "ok so I want like my grandmas kitchen but in the 70s you know with the orange tiles and stuff and theres a cat on the counter, a fat orange one, and sun coming in the window kinda dusty, uh and maybe a radio and a cake cooling, actually make it a pie, cherry pie, and it should look like an old photo, like a faded polaroid but not too faded you know" },
+    { "id": "party-bathroom", "nsfw": true, "shape": "ramble", "trap": "non-visual, self-correction", "prompt": "so theres this girl like early twenties dark hair in a messy bun and shes on her knees in the bathroom at a house party, music loud outside people banging on the door, and shes sucking this guys cock and its huge she can barely fit it, mascara running down her face, looking up at the camera like pov, actually make it him filming on his phone, shaky amateur, red solo cup on the sink, her sparkly party dress pulled down so her tits are out, and that shitty yellow bathroom light" }
+  ],
+  "own": {
+    "krea2": [
+      { "id": "tee-pov", "nsfw": true, "shape": "one", "ref": "Krea 2 #4", "prompt": "blonde with big tits lying on the pillows in an oversized black tee slipping off her shoulder, pov from above, kodak gold film" },
+      { "id": "purple-bed", "nsfw": true, "shape": "two", "ref": "Krea 2 #15", "prompt": "amateur iphone pic, hot blonde college girl face down on a purple bed getting fucked from behind. hes pushing her head into the mattress and grabbing her ass, sunset light through the window" },
+      { "id": "altgirl", "nsfw": true, "shape": "tiny", "ref": "Krea 2 #13", "prompt": "altgirl barstool wormseye ass pussy" },
+      { "id": "chrome-collar", "nsfw": false, "shape": "one", "ref": "Krea 2 #5", "prompt": "high fashion shot, red haired model with oiled skin and a chrome collar on a pure white background, super bright high key" },
+      { "id": "kitchen-crocs", "nsfw": false, "shape": "two", "ref": "Qwen 2.1 #37", "prompt": "candid morning photo of a woman in a ribbed tank top frying eggs in a cast iron pan. messy hair, green crocs, dusty window light, cluttered vintage kitchen" },
+      { "id": "massage-pov", "nsfw": true, "shape": "ramble", "ref": "Krea 2 #26", "prompt": "first person pov im on top of this petite blonde on a massage table and my cock is deep in her pussy and shes looking back at me all into it with green eyes, and her friend is standing in the doorway in sweatpants arms crossed looking pissed, candles everywhere spa vibe, raw phone shot kinda grainy like portra" }
+    ],
+    "sdxl": [
+      { "id": "pillow", "nsfw": true, "shape": "tiny", "ref": "SDXL #1", "prompt": "tomboy pillow humping, backwards cap" },
+      { "id": "clit-closeup", "nsfw": true, "shape": "one", "ref": "SDXL #45", "prompt": "close up of a wet pussy with trimmed blonde pubes and a big swollen clit, backlit studio shot" },
+      { "id": "nordic-bed", "nsfw": true, "shape": "two", "ref": "SDXL #43", "trap": "negation", "prompt": "nordic blonde model lying naked on a bed with her legs spread. full body from above, freckles, pale skin, no tattoos, photoreal" },
+      { "id": "sakura-psych", "nsfw": false, "shape": "one", "ref": "SDXL SFW 1", "prompt": "psychedelic japan night landscape with yellow sakura instead of pink, full moon over a lake, john martin vibes" },
+      { "id": "nimue", "nsfw": false, "shape": "two", "ref": "SDXL SFW 5", "prompt": "nimue the lady of the lake in her human disguise, copper red wet hair and a plain linen dress. foggy forest lake at dawn, mythic but realistic" },
+      { "id": "emo-dildo", "nsfw": true, "shape": "ramble", "ref": "SDXL Year 1", "prompt": "emo girl black hair eyeliner squatting on a huge dildo in a dressing room doing a mirror selfie, uh black crop top skirt lifted up, thighhighs and sneakers, its going in her ass, shes moaning, one arm holding herself up, amateur photo like an onlyfans pic" }
+    ],
+    "pony": [
+      { "id": "tennis-visor", "nsfw": false, "shape": "one", "ref": "Pony #3", "prompt": "blonde tennis girl in white visor and tennis dress sitting on a teal floor, worms eye view, pearl earrings" },
+      { "id": "goth-hood", "nsfw": false, "shape": "tiny", "ref": "Pony #30", "prompt": "goth girl red eyes cat hood" },
+      { "id": "futa-maid", "nsfw": true, "shape": "two", "ref": "Pony #17", "prompt": "futa maid with a small cock getting fucked in the ass by a guy, shes on her back with her tits out. exhausted face, half closed eyes, blushing" },
+      { "id": "beach-voyeur", "nsfw": true, "shape": "one", "ref": "Pony #21", "prompt": "brunette bob girl in a floral bikini top, bare ass, getting fucked doggy in the bushes at the beach, voyeur angle" },
+      { "id": "waitress", "nsfw": true, "shape": "tiny", "ref": "Pony #33", "prompt": "waitress deepthroat french riviera, customers watching" },
+      { "id": "catra-desk", "nsfw": true, "shape": "ramble", "ref": "Pony #31", "prompt": "catra from she-ra the new one, sitting on her office desk in an unbuttoned white shirt and a black bra, nothing on below just thigh highs, shes fingering her pussy with one leg up on the desk and leaning back on her other arm, smug face, red glasses, and theres like a puddle on the desk lol, furry, detailed fur" }
+    ],
+    "flux1": [
+      { "id": "void-hood", "nsfw": false, "shape": "one", "ref": "Flux #5", "prompt": "hooded figure with a yellow laser sword walking across red cracked desert, face is just a black void, graphic novel ink style" },
+      { "id": "bedouin", "nsfw": false, "shape": "two", "ref": "Flux #57", "prompt": "double exposure poster of a bedouin woman in a patterned headwrap. desert dunes and a caravan blending into her silhouette" },
+      { "id": "headlights", "nsfw": false, "shape": "tiny", "ref": "Flux Year 9", "prompt": "nu disco album cover \"Headlights\"" },
+      { "id": "stream", "nsfw": true, "shape": "one", "ref": "Flux Year 1", "prompt": "wet blonde topless crouching on a log in a forest stream in the rain, black stockings, guy behind her with his hands on her hips" },
+      { "id": "futa-pool", "nsfw": true, "shape": "two", "ref": "Flux #53", "prompt": "futa sitting on a lounge chair by the pool in a yellow lace thong and halter. shes holding her big tits and her uncut cock is hard" },
+      { "id": "bw-blowjob", "nsfw": true, "shape": "ramble", "ref": "Flux Year 14", "prompt": "black and white close up of a blowjob, like her lips wrapped around his cock, really dramatic shadows, chiaroscuro, i want it erotic but artsy like a gallery photo not cheap porn, deep blacks, you can see part of her face and his hand in her hair" }
+    ],
+    "qwen21": [
+      { "id": "ramen-sign", "nsfw": false, "shape": "one", "prompt": "cosy ramen shop at night in the rain, neon sign says \"Midnight Noodles\"" },
+      { "id": "espresso", "nsfw": false, "shape": "tiny", "prompt": "infographic \"How Espresso Works\"" },
+      { "id": "thighgap", "nsfw": true, "shape": "one", "ref": "Qwen 2.1 #36", "prompt": "amateur lower body pic of a skinny nude woman with a script tattoo above her hip that says \"thighgap\", plain white background" },
+      { "id": "washer", "nsfw": true, "shape": "two", "ref": "Qwen 2.1 #12", "prompt": "slavic girl stuck bent over in a washing machine with her yoga pants pulled down, guy fucking her pussy from behind while he films on his phone. shes looking back over her shoulder embarrassed but clearly into it" },
+      { "id": "pink-cuffs", "nsfw": true, "shape": "two", "ref": "Qwen 2.1 #2", "prompt": "blonde with a big pink bow, ass up face down on a pink bed, naked except pink stockings. pink fuzzy handcuffs behind her back, shot from behind and above" },
+      { "id": "dslr-selfie", "nsfw": true, "shape": "ramble", "ref": "Qwen 2.1 #40", "prompt": "so a nude selfie on her bed but her face is hidden behind a big black dslr shes holding, long black hair, small tits pink nipples, she has her legs crossed to hide her crotch, a beaded bracelet and gold necklace, theres green vines on the wall and a little bedside table, soft dim light, like a private everyday nude vibe you know" }
+    ]
+  }
+}
