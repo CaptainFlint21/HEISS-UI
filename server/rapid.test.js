@@ -110,11 +110,11 @@ test("each model gets one accelerator: the half-size start, or step reuse where 
   const plain = { referenceAssets: [], inpaint: null };
   // Krea 2 Turbo grows later than Raw: 6 of its 8 steps at half size (measured, docs/rapid.md).
   assert.deepEqual(sanitizeRapid({ rapid: true, steps: 8 }, { kind: "image", family: "krea2", variant: "turbo", capabilities: { rapid: true } }, plain), { at: 0.45, smooth: false });
-  // Qwen-Image 2.1 spots at half size: step reuse instead, from 40% of the schedule; Speed moves where it begins.
+  // Qwen-Image 2.1 spots at half size: step reuse instead, from half the schedule; Speed moves where it begins.
   const qwen = { kind: "image", family: "qwen_image_21", variant: "standard", capabilities: { rapid: true } };
-  assert.deepEqual(sanitizeRapid({ rapid: true, steps: 25 }, qwen, plain), { cache: { threshold: 0.3, start: 0.4, end: 0.95 } });
-  assert.equal(sanitizeRapid({ rapid: true, rapidSpeed: "faster" }, qwen, plain).cache.start, 0.3);
-  assert.equal(sanitizeRapid({ rapid: true, rapidSpeed: "careful" }, qwen, plain).cache.start, 0.5);
+  assert.deepEqual(sanitizeRapid({ rapid: true, steps: 25 }, qwen, plain), { cache: { threshold: 0.3, start: 0.5, end: 0.95 } });
+  assert.equal(sanitizeRapid({ rapid: true, rapidSpeed: "faster" }, qwen, plain).cache.start, 0.4);
+  assert.equal(sanitizeRapid({ rapid: true, rapidSpeed: "careful" }, qwen, plain).cache.start, 0.6);
   const family = families.qwen_image_21;
   assert.equal(rapidCapability(family, family.variants[0], { EasyCache: {} }), "ready", "ComfyUI's own node: nothing to install");
   assert.equal(rapidCapability(family, family.variants[0], withRapid), false, "a ComfyUI without EasyCache");

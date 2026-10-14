@@ -79,7 +79,7 @@ Each family can carry `rapid: { at }`, and a variant can override or disable it 
 | Z-Image | 0.7 | LC |
 | Flux.2 Klein / Dev | 0.7 | LC (1.3× at 4 steps) |
 | Qwen-Image | 0.7 | LC lists it; measure it |
-| Qwen-Image 2.1 | step reuse instead (`cache: 0.3, cacheFrom: 0.4`) | measured 2026-10-14: the half-size start spots its skin; see Step reuse below |
+| Qwen-Image 2.1 | step reuse instead (`cache: 0.3, cacheFrom: 0.5`) | measured 2026-10-14: the half-size start spots its skin; see Step reuse below |
 | Flux.1, Chroma | 0.85 to start | SwarmNeo: text breaks below about 0.94 at 40 steps. We measure with the text probe and choose. |
 | SDXL / Pony / Illustrious | 0.6 | LC's sweep (5 checkpoints, 4 samplers, 4 schedulers) |
 
@@ -246,8 +246,8 @@ Measured on the RTX 3070 (8 GB), seed 42, portrait and text prompts. Sampling ti
 
 | Model | Size | Off | Half-size start | Step reuse |
 |---|---|---|---|---|
-| Qwen-Image 2.1 (25 steps) | 1024² | 17.1s | 12.5s, spotted skin and a glitchy sign | 10.7s (0.3 from 0.4), clean |
-| Qwen-Image 2.1 | 1536² | 43.3s | 36.6s at 0.85 (no spots, still degraded) | 26.2s (0.3 from 0.4), clean |
+| Qwen-Image 2.1 (25 steps) | 1024² | 17.1s | 12.5s, spotted skin and a glitchy sign | 10.7s (0.3 from 0.4), clean at sheet scale |
+| Qwen-Image 2.1 | 1536² | 43.3s | 36.6s at 0.85 (no spots, still degraded) | 26.2s (0.3 from 0.4): menu clean, "1987" reads "1937"; **31.3s (0.3 from 0.5), text as off: shipped, 1.39×** |
 | Krea 2 Turbo (8 steps) | 1024² | 30.5s | 20.4s at 0.45 (22.2s at 0.7) | ≈25.5s: skips 1-2 of 8 |
 | Krea 2 Turbo | 1536² | 56.5s | 31.4s at 0.45 (35.5s at 0.7) | – |
 | Flux.2 Klein 9B (4 steps) | 1024² / 1536² | 7.9s / 16.4s | 6.3s / 11.2s | – |
@@ -255,7 +255,7 @@ Measured on the RTX 3070 (8 GB), seed 42, portrait and text prompts. Sampling ti
 | Pony (SDXL, 25 steps, CFG 5, euler) | 1024² | 11.8s | – | 6.7s, but text smears |
 
 What the pictures showed:
-- **Step reuse from the default 15% of the schedule garbles small text** at 1536² (the chalkboard's "1.80" turned into "1.20" with doubled strokes) at every threshold from 0.15 to 0.3, and ending it at 80% did not help. Starting it at 40% keeps the text as the run without it, at 0.2 and 0.3 alike; 0.25 from 30% already ghosts a digit. The pictures at 1024² looked the same as off at sheet scale, so look at text crops.
+- **Step reuse from the default 15% of the schedule garbles small text** at 1536² (the chalkboard's "1.80" turned into "1.20" with doubled strokes) at every threshold from 0.15 to 0.3, and ending it at 80% did not help. Starting it at 40% keeps the menu as the run without it, at 0.2 and 0.3 alike, but the sign's small "EST. 1987" reads "1937" at both; 0.25 from 30% already ghosts a menu digit. From 50% (0.3) both read as off, at 1.39×: the catalog uses that, and Faster moves it back to 40% (1.65×). 0.12 from 40% is about as clean at 1.47×. Every setting leaves the face a touch darker than off, a small tonal shift, not damage. The pictures at 1024² looked the same as off at sheet scale, so look at text crops.
 - **The half-size start breaks Qwen-Image 2.1 at 0.7**: leopard-like spots on skin and a doubled outline on the sign, with or without the smoothing step. At 0.85 the spots are gone but the picture is still worse (harsh, over-sharpened skin, an invented header and a lost digit on the chalkboard) and it saves little.
 - **Step reuse does nothing on few-step distills** (Krea Turbo, Z-Image Turbo): there are no steps similar enough to skip. **With an ancestral sampler** (Pony's euler_ancestral) it skips none, since the fresh noise each step moves the input.
 - **On SDXL with euler it skips half the steps but smears text**, so SDXL keeps the half-size start.
