@@ -223,6 +223,18 @@ Where the switch actually happened, from the ComfyUI log:
 The agent judged 0.6 indistinguishable from off on both models. For these schedules 0.6 and 0.7 land on the same step, so the catalog keeps 0.7.
 
 
+### RTX 4090 (24 GB), 2026-10-14, ComfyUI 0.37.0, HEISS UI Nodes 9 (rented, Linux)
+
+The same small set (seed 42, portrait and text, Rapid without the smoothing step as HEISS runs it below 12 steps), on a card where every model stays in VRAM. Sampling times:
+
+| Model | 1024² off → Rapid | 1536² off → Rapid |
+|---|---|---|
+| Krea 2 Turbo fp8 (at 0.45) | 5.9s → 2.8s, 2.12× | 14.4s → 6.1s, 2.36× |
+| Flux.2 Klein 4B | 1.13s → 0.77s, 1.47× | 2.67s → 1.68s, 1.59× |
+| Z-Image Turbo bf16 | 3.4s → 2.2s, 1.58× | 8.8s → 5.3s, 1.65× |
+
+The speed-ups are larger than on the 3070, where weights streaming from RAM add a fixed cost per step that Rapid doesn't shrink. Pictures: Krea 2 and Z-Image hold skin, rain and the chalkboard at both sizes. Klein 4B is fine at 1024²; at 1536² its sign is garbled with and without Rapid ("ROSA' SRAKERY" off, "ROSS A'Y BAKERY" on). On Klein 4B at 1024², VAE decode and encoding are now most of the total (2.0s total for 0.77s of sampling).
+
 ## Rapid Guidance (2026-10-08)
 
 The second part of Rapid, with its own switch: **HEISS Rapid Guidance** (`HeissRapidGuidance`, in the same pack) replaces `CFGGuider`.
