@@ -56,6 +56,19 @@ export const variants = {
     system: swap(plan.system, "Describe concretely and visually:", "Describe literally, like a photographer's shot list, with no metaphors or comparisons, and add only details that fit the person's picture as they described it:")
   }),
 
+  // The roll for what the idea leaves open, moved from the system prompt to the end of the user turn, where a small
+  // model weighs it most, and said as choices made for this picture.
+  "roll-user": (plan) => {
+    const parts = plan.system.split("\n\n");
+    const at = parts.findIndex((part) => part.startsWith("Where the idea leaves them open"));
+    if (at < 0) return plan;
+    const match = parts[at].match(/this time use (.+) and (.+); a person it doesn't describe has (.+) and (.+)\.$/);
+    if (!match) return plan;
+    const [, framing, light, hair, expression] = match;
+    parts.splice(at, 1);
+    return { ...plan, system: parts.join("\n\n"), prompt: `${plan.prompt}\n\nFor this picture, wherever the idea doesn't say otherwise: ${framing}, ${light}, and any person in it has ${hair}, ${expression}.` };
+  },
+
   // Sampling.
   "temp-0.55": (plan) => ({ ...plan, temperature: 0.55 }),
   "temp-0.85": (plan) => ({ ...plan, temperature: 0.85 })
