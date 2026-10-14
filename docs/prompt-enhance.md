@@ -24,9 +24,10 @@ How the system prompt is written follows what a 4B model actually does with it (
 - **Rules say what to do.** A small model turns "never X" into X, or into `no_x` tags, so the system prompt has no lists of what to avoid.
 - **One worked example per task** carries the register better than more rules.
 - **Sex terms are looked up, not guessed** (`server/prompt-terms.js`). A 4B model knows the words but not the positions ("missionary" came back as a missionary in a long dress). The terms an idea uses, and only those, go into its system prompt with their plain meaning and Danbooru tags. Everyday senses (a cowgirl on a horse, a spa facial) only count in a sexual idea.
-- **`finishPrompt` cleans up what the model still does:** negative and sentence-length tags, "solo" beside a second person, prose sentences that only say what's absent.
+- **A short idea gets a roll for what it leaves open:** a framing, a light, and, for a person it doesn't describe, a hair and an expression. Basic acts with several natural poses (masturbation, a blowjob, plain "having sex" with no position named) roll one. Left alone, a 4B model writes its single likeliest version every time: "portrait of a woman" came back as the same centered, dark-haired, neutral woman in 4 of 4 takes, and Try again changed nothing. Anything the idea says wins over the roll, and an idea over 40 words gets none, since it has made its own choices. The app rolls randomly; the eval rolls from the seed.
+- **`finishPrompt` cleans up what the model still does:** negative and sentence-length tags, "solo" beside a second person, a missing 1boy when an act takes a man; in prose, sentences that only say what's absent, "X or Y" hedges about one thing (the first stays), and the "no filters or stylization" sign-off.
 
-`evals/enhance` runs base prompts through this exact code (`enhancePlan` → `runEnhance` → `finishPrompt`) with timing for each run, for reading against reference prompts.
+`evals/enhance` runs base prompts through this exact code (`enhancePlan` → `runEnhance` → `finishPrompt`) with timing for each run, for reading against reference prompts. A detailed idea longer than the usual word range keeps its room: the range and token budget grow to its length.
 
 Settings › Features › Prompt enhance sets the model, the style (Faithful, Balanced, Bold; the sampling temperature), and standing instructions added to every request.
 
