@@ -30,6 +30,10 @@ test("length fits the model: short for CLIP, long for the big LLM encoders, tags
   assert.deepEqual(promptLength("image", "flux1"), [70, 130]);
   assert.deepEqual(promptLength("video", "ltx"), [120, 200]);
   assert.equal(tokenBudget("tags", "sdxl"), 45 * 3 + 20);
+  // A detailed idea longer than the usual range keeps its room; tags stay tags.
+  assert.deepEqual(promptLength("image", "krea2", 260), [100, 286]);
+  assert.deepEqual(promptLength("image", "krea2", 40), [100, 180]);
+  assert.deepEqual(promptLength("tags", "sdxl", 260), [25, 45]);
   assert.ok(tokenBudget("image", "flux1") < 300);
 });
 

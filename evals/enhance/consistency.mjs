@@ -26,7 +26,7 @@ export const checks = [
 /** The checks a prose output fails. */
 export const flagsFor = (text) => checks.filter((check) => check.a.test(text) && check.b.test(text) && !(check.unless && check.unless.test(text))).map((check) => check.name);
 
-const runs = import.meta.url === pathToFileURL(process.argv[1]).href ? process.argv.slice(2) : [];
+const runs = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href ? process.argv.slice(2) : [];
 let total = 0;
 let flagged = 0;
 for (const name of runs) {
@@ -40,4 +40,4 @@ for (const name of runs) {
     console.log(`\n## ${name} ${run.family}/${run.case}/${run.take} — ${hits.map((hit) => hit.name).join("; ")}\n> ${run.base}\n${run.output}`);
   }
 }
-console.log(`\n${flagged} of ${total} prose outputs flagged`);
+if (runs.length) console.log(`\n${flagged} of ${total} prose outputs flagged`);

@@ -53,8 +53,18 @@ function tagStyle(family, variant) {
   return family === "sdxl" ? tagVariants[variant] || "" : "";
 }
 
-/** How long the prompt should be, in words, for this target and family. */
-export function promptLength(target, family = "") {
+/**
+ * How long the prompt should be, in words, for this target and family. An idea already longer than that keeps its
+ * room: the range grows to its length, so a detailed prompt isn't squeezed or cut off at the token cap.
+ */
+export function promptLength(target, family = "", inputWords = 0) {
+  const [low, high] = basicLength(target, family);
+  return target !== "tags" && target !== "tags-describe" && inputWords > high ? [low, Math.round(inputWords * 1.1)] : [low, high];
+}
+
+const wordCount = (text) => (String(text || "").match(/\S+/g) || []).length;
+
+function basicLength(target, family) {
   if (target === "tags" || target === "tags-describe") return [25, 45];
   if (target === "edit") return [20, 60];
   if (target === "motion") return audioFamilies.has(family) || longFamilies.has(family) ? [80, 150] : [50, 100];
@@ -105,7 +115,7 @@ const soundRules = `Weave the sound in alongside the action, not at the end: amb
 
 /** The system prompt for one target, family, the idea (for the sex terms it uses) and the person's own standing instructions. */
 export function systemPrompt(target, { family = "", variant = "", instructions = "", text = "" } = {}) {
-  const [low, high] = promptLength(target, family);
+  const [low, high] = promptLength(target, family, wordCount(text));
   const words = `${low} to ${high} words`;
   const sound = audioFamilies.has(family) ? `\n\n${soundRules}` : "";
   // Said in the task itself, where a small model can't miss it.
@@ -137,8 +147,8 @@ export function userTurn(target, text = "") {
 export const isTagTarget = (target) => target === "tags" || target === "tags-describe";
 
 /** Room for the answer: a word takes about 1.5 tokens, a tag about 3; the cap stays near what is asked so a run can't ramble. */
-export function tokenBudget(target, family = "") {
-  const [, high] = promptLength(target, family);
+export function tokenBudget(target, family = "", inputWords = 0) {
+  const [, high] = promptLength(target, family, inputWords);
   return isTagTarget(target) ? high * 3 + 20 : Math.round(high * 1.7) + 40;
 }
 
@@ -222,7 +232,7 @@ export function enhancePlan({ kind = "image", family = "", variant = "", text = 
     target,
     system: systemPrompt(target, { family, variant, instructions: settings.instructions, text }),
     prompt: userTurn(target, text),
-    maxTokens: tokenBudget(target, family),
+    maxTokens: tokenBudget(target, family, wordCount(text)),
     // "Again" asks for another take: a little more freedom than the first.
     temperature: Math.min(1.2, settings.creativity + (again ? 0.15 : 0))
   };
