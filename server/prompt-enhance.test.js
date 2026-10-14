@@ -75,6 +75,13 @@ test("tags: no_x and sentence tags go, people tags agree with each other", () =>
   assert.equal(finishPrompt("tags", "no humans, scenery, castle", "sdxl"), "no humans, scenery, castle");
 });
 
+test("prose: hedges settle on one choice, the 'no filters' sign-off goes, negations and two-word choices stay", () => {
+  assert.equal(finishPrompt("image", "Hands gripping her hips or thighs. Shot on film, no filters or stylization."), "Hands gripping her hips. Shot on film.");
+  assert.equal(finishPrompt("image", "She is kneeling or standing just out of frame, clothing — if any — pushed aside."), "She is kneeling just out of frame, clothing pushed aside.");
+  assert.equal(finishPrompt("image", "She is nude, no clothing on her torso or legs."), "She is nude, no clothing on her torso or legs.");
+  assert.equal(finishPrompt("image", "His arms are behind his head or at his sides."), "His arms are behind his head or at his sides.");
+});
+
 test("prose: sentences that only say what's absent go, sentences that mean something stay", () => {
   assert.equal(finishPrompt("image", "A woman sits. No other people are visible. Medium: photo."), "A woman sits. Medium: photo.");
   assert.equal(finishPrompt("image", "Night. No text or logos appear."), "Night.");

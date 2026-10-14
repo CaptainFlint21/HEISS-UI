@@ -5,7 +5,7 @@
 // (base and enhanced side by side, for reading).
 //
 //   node evals/enhance/run.mjs [--name baseline] [--families krea2,pony] [--cases office,motel]
-//                              [--kind video] [--repeat 2] [--model <file>] [--creativity 0.7] [--seed random]
+//                              [--variant no-example+temp-0.85] [--kind video] [--repeat 2] [--model <file>] [--creativity 0.7] [--seed random]
 import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -17,6 +17,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 process.env.HEISS_DATA_DIR ||= path.join(here, "results", ".data");
 const { comfyUrl } = await import("../../server/comfy.js");
 const { enhanceDefaults, enhanceModel, enhancePlan, finishPrompt, runEnhance } = await import("../../server/prompt-enhance.js");
+const { applyVariant } = await import("./variants.mjs");
 
 const args = {};
 process.argv.slice(2).forEach((arg, i, all) => { if (arg.startsWith("--")) args[arg.slice(2)] = all[i + 1]?.startsWith("--") ? "1" : all[i + 1] ?? "1"; });
@@ -43,7 +44,9 @@ console.log(`${jobs.length} runs · ${model} · creativity ${settings.creativity
 
 for (const [index, { key, item, take }] of jobs.entries()) {
   const fam = cases.families[key];
-  const plan = enhancePlan({ kind: args.kind === "video" ? "video" : "image", family: fam.family, variant: fam.variant, text: item.prompt }, settings);
+  const appPlan = enhancePlan({ kind: args.kind === "video" ? "video" : "image", family: fam.family, variant: fam.variant, text: item.prompt }, settings);
+  // --variant: an A/B change to what the app would send (variants.mjs).
+  const plan = applyVariant(args.variant, appPlan, { item, family: fam });
   // Fixed per case unless asked otherwise, so a change to the enhancer is compared on the same seeds.
   const seed = args.seed === "random" ? crypto.randomInt(0, 2 ** 31) : crypto.createHash("sha1").update(`${key}/${item.id}/${take}`).digest().readUInt32BE(0) >>> 1;
   const at = {};
@@ -64,7 +67,7 @@ for (const [index, { key, item, take }] of jobs.entries()) {
     family: key, case: item.id, take, nsfw: item.nsfw, shape: item.shape, target: plan.target, base: item.prompt, output, raw: raw !== output ? raw : undefined, error,
     words: output.split(/\s+/).filter(Boolean).length,
     telemetry: {
-      model, seed, temperature: plan.temperature, maxTokens: plan.maxTokens, systemChars: plan.system.length,
+      model, variant: args.variant || "base", seed, temperature: plan.temperature, maxTokens: plan.maxTokens, systemChars: plan.system.length,
       queuedMs: at.queued, startMs: at.loading, firstTextMs: at.text, totalMs: Math.round(performance.now() - t0),
       tokens: stats?.tokens, nodeSeconds: stats?.seconds, tokensPerSecond: stats?.tokens ? +(stats.tokens / stats.seconds).toFixed(1) : undefined,
       hitCap: stats?.tokens >= plan.maxTokens - 1, vramBefore, vramAfter: vram()

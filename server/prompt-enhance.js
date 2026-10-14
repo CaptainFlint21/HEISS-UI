@@ -149,11 +149,32 @@ const absentSentence = /^(no|nothing|without)\b[^.!?]*\b(other (people|person|ob
 // Hedges an image model can't draw: "clothing — if any —", "depending on positioning", "perhaps", "possibly".
 const hedges = [/\s*[—–-]+\s*if any\s*[—–-]+\s*/gi, /,?\s*\bif any\b/gi, /,?\s*\bdepending on [^,.;]+/gi, /\b(perhaps|possibly|presumably|maybe) /gi];
 
+// "X or Y" about one thing ("on the steering wheel or dashboard", "her thighs or hips", "gripping or pushing"):
+// the first choice stays.
+// A noun choice only when the second one ends the phrase, and never inside a negation ("no clothing on her torso
+// or legs" means neither).
+const phraseEnd = String.raw`(?=[,.;:!?]| and | while | as |$)`;
+const eitherOr = [
+  [/\b(\w+ing) or \w+ing\b/g, "$1"],
+  [new RegExp(String.raw`\b(on|onto|against|around|over|across|near|beside|under) ((?:the |her |his |their )?[\w-]+) or (?:the |her |his |their )?[\w-]+\b${phraseEnd}`, "gi"), "$1 $2"],
+  [new RegExp(String.raw`\b(her|his|their) ([\w-]+) or (?:her |his |their )?[\w-]+\b${phraseEnd}`, "gi"), "$1 $2"]
+];
+const negated = /\b(no|not|without|neither|never)\b[^,.;]*$/i;
+const collapseEitherOr = (text) => eitherOr.reduce((result, [pattern, keep]) => result.replace(pattern, (match, ...groups) => {
+  const offset = groups[groups.length - 2];
+  if (negated.test(result.slice(Math.max(0, offset - 40), offset))) return match;
+  return keep.replace(/\$(\d)/g, (_, index) => groups[Number(index) - 1]);
+}), text);
+
+// The model's sign-off ("no filters or stylization", "no CGI"): it says nothing an image model can use.
+const filler = /\s*[,;—–]?\s*(?:with )?no (?:filters?|stylization|stylized effects|cgi|smoothing|polish|retouching|editing|glamorization)\b(?:\s*(?:,|or|and|—)\s*(?:no )?(?:filters?|stylization|stylized effects|cgi|smoothing|polish|retouching|editing|effects|idealization|glamorization)\b)*/gi;
+
 function finishProse(text = "") {
   const sentences = String(text).trim().match(/[^.!?]+(?:[.!?]+["”’)]?|$)\s*/g) || [];
   const kept = sentences.filter((sentence) => !absentSentence.test(sentence.trim()));
   const prose = (kept.length ? kept.join("") : String(text)).trim();
-  return hedges.reduce((result, hedge) => result.replace(hedge, (match) => (/^\s*[—–-]/.test(match) ? " " : "")), prose).replace(/ {2,}/g, " ").replace(/ ([,.;])/g, "$1")
+  const plain = collapseEitherOr(prose.replace(filler, ""));
+  return hedges.reduce((result, hedge) => result.replace(hedge, (match) => (/^\s*[—–-]/.test(match) ? " " : "")), plain).replace(/ {2,}/g, " ").replace(/ ([,.;])/g, "$1").replace(/([,;])\s*([.!?])/g, "$2").replace(/—\s*([.!?])/g, "$1")
     .replace(/(^|[.!?]\s+)([a-z])/g, (match, before, letter) => before + letter.toUpperCase());
 }
 

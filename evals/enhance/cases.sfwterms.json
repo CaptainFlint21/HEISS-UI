@@ -1,0 +1,19 @@
+{
+  "about": "SFW vocabulary probe: photography, lighting, film and art terms a 4B model might not know. Does SFW need a terms table like prompt-terms.js?",
+  "families": { "krea2": { "label": "Krea 2", "family": "krea2", "variant": "turbo" }, "flux1": { "label": "Flux.1 Dev", "family": "flux1", "variant": "dev" } },
+  "shared": [
+    { "id": "t-dutch", "nsfw": false, "shape": "one", "prompt": "detective in a rainy alley, dutch angle" },
+    { "id": "t-tiltshift", "nsfw": false, "shape": "one", "prompt": "tilt-shift photo of a busy train station" },
+    { "id": "t-knolling", "nsfw": false, "shape": "tiny", "prompt": "knolling of a photographer's camera bag" },
+    { "id": "t-rembrandt", "nsfw": false, "shape": "one", "prompt": "old sailor portrait, rembrandt lighting" },
+    { "id": "t-cinestill", "nsfw": false, "shape": "one", "prompt": "diner at night shot on cinestill 800t" },
+    { "id": "t-risograph", "nsfw": false, "shape": "tiny", "prompt": "risograph poster of a fox" },
+    { "id": "t-longexposure", "nsfw": false, "shape": "one", "prompt": "long exposure of a highway at night, light trails" },
+    { "id": "t-isometric", "nsfw": false, "shape": "tiny", "prompt": "isometric cozy bedroom diorama" },
+    { "id": "t-split", "nsfw": false, "shape": "one", "prompt": "boxer portrait with split lighting, black background" },
+    { "id": "t-ukiyoe", "nsfw": false, "shape": "tiny", "prompt": "ukiyo-e wave with a surfer" },
+    { "id": "t-macro", "nsfw": false, "shape": "one", "prompt": "macro shot of a bee on lavender, focus stacked" },
+    { "id": "t-fisheye", "nsfw": false, "shape": "one", "prompt": "skateboarder doing a kickflip, fisheye lens, 90s skate video look" }
+  ],
+  "own": {}
+}

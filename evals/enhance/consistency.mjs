@@ -3,12 +3,12 @@
 // score. node evals/enhance/consistency.mjs <run> [<run> …]
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
 // Each check: two things said of the same scene that can't both hold. `unless` excuses the usual way out.
-const checks = [
+export const checks = [
   { name: "on her back + from behind / face down", a: /\b(lies|lying|laid) (flat )?on her back\b|\bon her back\b/i, b: /\bfrom behind\b|\bface[- ]down\b|\bon her (stomach|belly)\b|\bhands and knees\b|\ball fours\b|\bbent over\b/i },
   { name: "face down / facing away + eye contact", a: /\bface[- ]down\b|\bfacing away\b|\bback to the camera\b|\bher back (is )?(to|toward) (the camera|the viewer)\b/i, b: /\blook(s|ing)? (directly )?(at|into) (the camera|the lens|the viewer)\b|\beye contact\b/i, unless: /\bover (her|his) shoulder\b|\blooks? back\b|\blooking back\b|\bturn(s|ed|ing)? her head\b/i },
   { name: "astride / riding + lying on her back", a: /\b(astride|straddl\w+|riding|rides)\b/i, b: /\b(she|woman|girl)[^.]{0,40}\b(lies|lying) on her back\b/i },
@@ -23,7 +23,10 @@ const checks = [
   { name: "both hands busy + a third task", a: /\bone hand\b[^.]*\bthe other( hand)?\b[^.]*\b(holding|holds|grips|gripping)\b[^.]*\b(phone|camera)\b/i, b: /\bboth hands\b/i }
 ];
 
-const runs = process.argv.slice(2);
+/** The checks a prose output fails. */
+export const flagsFor = (text) => checks.filter((check) => check.a.test(text) && check.b.test(text) && !(check.unless && check.unless.test(text))).map((check) => check.name);
+
+const runs = import.meta.url === pathToFileURL(process.argv[1]).href ? process.argv.slice(2) : [];
 let total = 0;
 let flagged = 0;
 for (const name of runs) {

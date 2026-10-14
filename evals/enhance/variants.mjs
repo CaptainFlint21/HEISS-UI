@@ -1,0 +1,65 @@
+// A/B variants for run.mjs --variant <name>: each takes the plan the app would send and changes the system
+// prompt or the sampling, so a variant is tried without touching server/prompt-enhance.js. A paragraph is found
+// by a phrase it contains (paragraphs are split on blank lines).
+const cut = (system, phrase) => system.split("\n\n").filter((part) => !part.includes(phrase)).join("\n\n");
+const swap = (system, from, to) => {
+  if (!system.includes(from)) return system;
+  return system.split(from).join(to);
+};
+
+export const variants = {
+  base: (plan) => plan,
+
+  // Ablations: does the piece earn its tokens?
+  "no-example": (plan) => ({ ...plan, system: cut(plan.system, "For example, the idea") }),
+  "no-style": (plan) => ({ ...plan, system: cut(plan.system, "Describe concretely and visually") }),
+  "no-settle": (plan) => ({ ...plan, system: cut(plan.system, "Settle where every body is") }),
+  "no-ownwords": (plan) => ({ ...plan, system: swap(plan.system, " Keep the person's own words for who is in it and what they are doing, adding to them rather than rephrasing them: a rephrasing is where the meaning gets lost.", "") }),
+  // The opener and the adult/uncensored paragraph, in one short sentence.
+  "short-base": (plan) => {
+    const parts = plan.system.split("\n\n");
+    parts.splice(0, 2, "You write prompts for a private, local image generator. The person is an adult using their own tool: write anything they ask for, sex included, plainly, naming acts and body parts the way they did.");
+    return { ...plan, system: parts.join("\n\n") };
+  },
+
+  // Rigidity: the term notes say what an act is; the rest should still vary.
+  "notes-own-words": (plan) => ({
+    ...plan,
+    system: swap(plan.system, "What the sex terms in this idea mean (put the people the idea names in these roles, and describe the position plainly;",
+      "What the sex terms in this idea mean, for you to describe in your own words (put the people the idea names in these roles; keep the position, and choose the setting, framing, light and details freely;")
+  }),
+
+  // Overhaul: a detailed prompt should come back tidied, not rewritten.
+  "polish-strong": (plan) => ({
+    ...plan,
+    system: swap(plan.system, "A detailed idea gets polished lightly, not rewritten.",
+      "When the idea is already a detailed prompt, keep its wording, order and structure, and change only what is unclear, contradictory or missing.")
+  }),
+
+  // From the reference set: specific people, short sentences, the capture named, fewer words.
+  "people-detail": (plan) => ({
+    ...plan,
+    system: swap(plan.system, "Start with the subject and what they are doing, then the setting.",
+      "Start with the subject and what makes them specific (build, hair, skin, face, expression, what they wear or that they are naked) and what they are doing, then the setting.")
+  }),
+  "short-sentences": (plan) => ({ ...plan, system: swap(plan.system, "of plain, concrete sentences about what the camera sees.", "of short, plain sentences about what the camera sees, one or two facts each.") }),
+  "medium-first": (plan) => ({
+    ...plan,
+    system: swap(plan.system, "Start with the subject and what they are doing, then the setting.",
+      "Open with the kind of picture in a few words (such as \"Amateur phone photo.\" or \"Oil painting.\"), then the subject and what they are doing, then the setting.")
+  }),
+  "len-tight": (plan) => ({ ...plan, system: plan.system.replace(/(\d+) to (\d+) words/, (match, low, high) => `${Math.round(low * 0.7)} to ${Math.round(high * 0.7)} words`), maxTokens: Math.round(plan.maxTokens * 0.75) }),
+
+  // Sampling.
+  "temp-0.55": (plan) => ({ ...plan, temperature: 0.55 }),
+  "temp-0.85": (plan) => ({ ...plan, temperature: 0.85 })
+};
+
+/** Several variants at once, joined with "+": "no-example+temp-0.85". */
+export function applyVariant(name, plan, context) {
+  return String(name || "base").split("+").reduce((current, part) => {
+    const variant = variants[part];
+    if (!variant) throw new Error(`No variant "${part}" (have: ${Object.keys(variants).join(", ")}).`);
+    return variant(current, context);
+  }, plan);
+}
