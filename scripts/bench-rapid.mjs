@@ -15,7 +15,7 @@
 //   --families a,b     only these families (family-catalog.js ids)
 //   --profiles a,b     only these model profiles (ids from --list)
 //   --rapid MODES      off, on (with the smoothing step), fast (without), comma-separated;
-//                      both = off,on · all = off,on,fast (default off)
+//                      both = off,on · all = off,on,fast · app = Rapid as the app sends it (default off)
 //   --rapid-at a,b     switch points to sweep for on/fast (default: each family's own)
 //   --rapid-scale x    start size for on/fast (default the node's 0.5)
 //   --rapid-min-full n full-size steps kept at the end (default 2)
@@ -49,11 +49,22 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 /** Probes for what a half-size start could cost: skin, hands, small text, framing. */
 const PROMPTS = {
+  // The showcase set: a portrait, an architectural scene and a still life with small engraved text.
+  fisherman: "Editorial portrait photograph of an elderly fisherman with a weathered, deeply lined face and a short white beard, wearing a navy wool knit cap and a rain-dampened yellow oilskin jacket, standing on a harbor dock at golden hour. Warm low sunlight from the side rakes across his skin, showing pores, wrinkles and stray beard hairs; his pale blue eyes look straight into the camera. Shallow depth of field, the fishing boats and masts behind him dissolve into soft bokeh. Shot on an 85mm lens at f/1.8, natural color, fine film grain.",
+  library: "Wide-angle architectural photograph of a brutalist concrete library interior: a soaring atrium with board-formed concrete walls, cantilevered reading balconies stacked on five levels, and a long skylight that slices sunlight across the space in sharp diagonal beams. Warm oak bookshelves line every floor, and a few people read at long tables far below, giving scale. Symmetrical one-point perspective, straight vertical lines, crisp concrete texture, fine dust glowing in the light shafts.",
+  watch: "Still life photograph of an antique brass pocket watch lying open on a weathered nautical chart, its inner lid engraved in elegant script with the words \"TEMPUS FUGIT\". Beside it sit an old compass, a coil of tarred rope and a half-melted candle in a pewter holder. Soft window light from the left, deep shadows, rich warm tones, macro detail on the scratches in the brass, the fine watch hands and the paper fibers of the map.",
   portrait: "Close-up photo portrait of a woman with freckles by a rainy window, soft daylight, visible skin pores, fine flyaway hair, 85mm lens",
   hands: "Photo of a man's hands playing a G major chord on an acoustic guitar, close-up on the fretboard, all fingers clearly visible, natural light",
   text: "Photo of a small corner bakery storefront at dusk, a hand-painted sign above the door reads \"ROSA'S BAKERY - EST. 1987\", a chalkboard menu in the window lists \"Croissant 2.50  Coffee 1.80  Pretzel 1.20\"",
   street: "Wide photo of a busy city street crossing in the rain at night, neon shop signs, people with umbrellas, reflections on the wet asphalt, a red tram in the background"
 };
+
+const PONY_PROMPTS = {
+  fisherman: "photo, realistic, 1boy, solo, old man, fisherman, white beard, wrinkled skin, blue eyes, knit cap, yellow raincoat, harbor, boats, golden hour, side lighting, looking at viewer, upper body, depth of field, bokeh",
+  library: "photo, realistic, scenery, no humans, library, indoors, brutalist architecture, concrete, atrium, balcony, bookshelf, skylight, sunbeam, light rays, dust, symmetry, one-point perspective, wide shot",
+  watch: "photo, realistic, still life, no humans, pocket watch, brass, open lid, engraved text, map, compass, rope, candle, wooden table, window light, dark, close-up, macro"
+};
+const promptIdOf = (text) => Object.keys(PROMPTS).find((id) => PROMPTS[id] === text);
 
 function args(argv) {
   const out = { rapid: "off", sizes: "1024x1024,1536x1536", seeds: "1234567,42", images: true };
@@ -120,12 +131,15 @@ if (!chosen.length) {
 const sizes = list(opts.sizes).map((item) => item.split("x").map(Number));
 const seeds = list(opts.seeds);
 const promptIds = list(opts.prompts).length ? list(opts.prompts) : Object.keys(PROMPTS);
-const modeNames = { both: ["off", "on"], all: ["off", "on", "fast"] }[opts.rapid] || list(opts.rapid || "off").filter((mode) => ["off", "on", "fast", "guide"].includes(mode));
+const modeNames = { both: ["off", "on"], all: ["off", "on", "fast"] }[opts.rapid] || list(opts.rapid || "off").filter((mode) => ["off", "on", "fast", "guide", "app"].includes(mode));
 const cutoffs = list(opts["cfg-until"]).map(Number).filter((value) => value >= 0 && value <= 1);
 const switchPoints = list(opts["rapid-at"]).map(Number).filter((value) => value >= 0.3 && value <= 0.99);
 // Each run mode: its label, and what the request asks for.
 const modes = modeNames.flatMap((mode) => {
   if (mode === "off") return [{ label: "off", rapid: false }];
+  // Rapid as the app sends it: both parts asked for; the server keeps what the model has (the smoothing step on
+  // 12+ steps, guidance only above CFG 1).
+  if (mode === "app") return [{ label: "app", rapid: true, rapidGuidance: true, app: true }];
   if (mode === "guide") {
     return cutoffs.length
       ? cutoffs.map((until) => ({ label: `guide@${until}`, rapid: false, rapidGuidance: true, rapidCfgUntil: until }))
@@ -246,6 +260,8 @@ async function saveImage(image, file) {
 }
 
 function graphFor(profile, { prompt, seed, width, height, mode = { rapid: false } }) {
+  // Pony reads tags, not sentences: its own version of the showcase set, quality tags in front.
+  if (profile.variant === "pony") prompt = `score_9, score_8_up, score_7_up, ${PONY_PROMPTS[promptIdOf(prompt)] || prompt}`;
   const input = {
     workflow: profile.workflow, profileId: profile.id, model: profile.model, kind: "image",
     prompt, seed, width, height, count: 1, rapid: mode.rapid, rapidAt: mode.rapidAt, rapidSmooth: mode.rapidSmooth,
@@ -282,7 +298,7 @@ for (const profile of chosen) {
     continue;
   }
   // A model without Rapid would just rerun the same graph, which ComfyUI answers from its cache in 0.01 s.
-  const profileModes = modes.filter((mode) => (!mode.rapid || profile.capabilities?.rapid) && (!mode.rapidGuidance || (profile.capabilities?.rapidGuidance && Number(opts.cfg ?? profile.defaults?.cfg) > 1)));
+  const profileModes = modes.filter((mode) => mode.app ? Boolean(profile.capabilities?.rapid || profile.capabilities?.rapidGuidance) : (!mode.rapid || profile.capabilities?.rapid) && (!mode.rapidGuidance || (profile.capabilities?.rapidGuidance && Number(opts.cfg ?? profile.defaults?.cfg) > 1)));
   if (profileModes.length < modes.length) console.log("  no Rapid for this model: only the off runs");
   for (const [width, height] of sizes) {
     for (const promptId of promptIds) {

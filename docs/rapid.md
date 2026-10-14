@@ -235,6 +235,25 @@ The same small set (seed 42, portrait and text, Rapid without the smoothing step
 
 The speed-ups are larger than on the 3070, where weights streaming from RAM add a fixed cost per step that Rapid doesn't shrink. Pictures: Krea 2 and Z-Image hold skin, rain and the chalkboard at both sizes. Klein 4B is fine at 1024²; at 1536² its sign is garbled with and without Rapid ("ROSA' SRAKERY" off, "ROSS A'Y BAKERY" on). On Klein 4B at 1024², VAE decode and encoding are now most of the total (2.0s total for 0.77s of sampling).
 
+### RTX 4090, the full set (2026-10-14, Rapid as the app sends it)
+
+`--rapid off,app`, seed 42, the showcase prompts (`fisherman`, `library`, `watch` at the default size; `fisherman`, `library` at 2048²). Official Comfy-Org / Stability / lodestones files. Sampling time, median; images in `evals/rapid-speed/g2-4090/` (not committed).
+
+| Model | Steps | Default (1024²) | 2048² |
+|---|---|---|---|
+| Krea 2 Turbo fp8 | 8 | 5.95s → 2.85s, 2.09× | 29.8s → 12.0s, 2.49× |
+| Z-Image Turbo bf16 | 8 | 3.45s → 2.21s, 1.56× | 18.2s → 10.9s, 1.67× |
+| Flux.2 Klein 4B | 4 | 1.10s → 0.74s, 1.49× | 5.5s → 3.4s, 1.64× |
+| Qwen-Image 2.1 int8 (step reuse) | 25 | 21.1s → 14.5s, 1.46× | 98.9s → 71.3s, 1.39× |
+| Chroma1-HD fp8 (CFG, 0.85) | 26 | 20.4s → 14.7s, 1.39× | 129.0s → 86.9s, 1.49× (one image) |
+| Flux.1 Dev fp8 (0.85) | 20 | 11.6s → 9.4s, 1.23× | not run |
+| SDXL 1.0 base (CFG 7) | 25 | 3.54s → 3.52s, 1.01× | 13.9s → 7.9s, 1.77× |
+
+- **SDXL at 1024² gains nothing on a 4090**: Rapid runs (13 of 25 small steps and guidance cut-off, confirmed in the log), but an SDXL step at that size is so cheap that the fixed cost per step dominates. At 2048² it is 1.77×, and the picture is better: without Rapid SDXL breaks above its native size (a doubled fisherman, a chaotic library), with Rapid the layout forms at 1024², its own size, and holds.
+- Pictures hold on every model: Krea 2, Z-Image and Qwen 2.1 keep "TEMPUS FUGIT"; Klein 4B wrote "TEMPS FUGIT" once with Rapid. Chroma and Flux.1 frame a little tighter. Flux.1 and Chroma don't render the engraving with or without Rapid.
+- Pony V6 base (1.04× default, 1.67× at 2048²) is left out: it doesn't read the prose prompts, so its pictures are broken either way.
+- Flux.1 Dev's 1.23× is the smallest gain: its 0.85 switch keeps text safe. It is the next family to sweep.
+
 ## Rapid Guidance (2026-10-08)
 
 The second part of Rapid, with its own switch: **HEISS Rapid Guidance** (`HeissRapidGuidance`, in the same pack) replaces `CFGGuider`.
