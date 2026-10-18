@@ -40,7 +40,13 @@ export type InpaintMask = { assetId: string; dataUrl: string };
 export type ReferenceInpaint = { slot: string; mask: string | null; onChange: (dataUrl: string | null) => void };
 /** What the framing reference is: the image being edited (its size is the output's) or only a reference (the picked size is). */
 export type ReferenceRole = "edit" | "reference";
-export type ReferenceRoleControl = { slot: string; value: ReferenceRole; onChange: (value: ReferenceRole) => void };
+export type ReferenceRoleControl = {
+  slot: string;
+  value: ReferenceRole;
+  onChange: (value: ReferenceRole) => void;
+  /** A painted mask settles it as Edit: shown as Edit (badge, greyed others, no +), Reference unavailable. */
+  locked?: boolean;
+};
 export type PromptComposition = { prefix?: string; suffix?: string; policy?: string; version?: number };
 export type GenerationSettings = Record<string, string | number | boolean | null | undefined | LoraSelection[]>;
 export type UpscaleQuality = "fast" | "balanced" | "high";
@@ -114,6 +120,10 @@ export type Profile = {
   family: string;
   /** The family's name as people know it ("Flux.1"), for built-in families. */
   familyName?: string;
+  /** Parts it runs without but works better with (FLUX.3's prompt upsampler), offered like missing ones. */
+  recommended?: MissingPart[];
+  /** A family with a guided setup dialog of its own (server/family-setup.js): its id. */
+  setupGuide?: string;
   defaults: Record<string, string | number>;
   aspectPresets: AspectPreset[];
   constraints?: Record<string, { min?: number; max?: number; step?: number; default?: number }>;
@@ -150,7 +160,7 @@ export type Profile = {
 export type EncoderSlot = { slot: string; label: string; options: string[]; default: string };
 export type PartDownload = { id: string; file: string; url: string; folder: string; label: string; bytes?: number; /** Already in a ComfyUI model folder, waiting for ComfyUI to list it. */ onDisk?: boolean; /** Who publishes it on Hugging Face (the repo owner), and the repo. */ source?: string; repo?: string };
 /** A ComfyUI custom node pack (server/node-packs.js). */
-export type NodePackInfo = { id?: string; name: string; repository: string; folder?: string; search?: string; note?: string; /** The reviewed commit a one-click install takes, and what it is (a release tag, or a branch and date). */ commit?: string; ref?: string };
+export type NodePackInfo = { id?: string; name: string; repository: string; folder?: string; search?: string; note?: string; /** Where the pack sits inside its repository, when it isn't the whole repository. */ subdir?: string; /** The reviewed commit a one-click install takes, and what it is (a release tag, or a branch and date). */ commit?: string; ref?: string };
 /** Which one-click routes HEISS has for a pack: Manager (the pack is in its list) and/or a local clone + pip. */
 export type PackAutoInstall = { manager: boolean; local: boolean };
 export type PackInstallState = { id: string; name: string; route: "manager" | "local"; status: "running" | "done" | "error" | "blocked"; step: string; log: string; error: string; startedAt: number; finishedAt: number; /** Blocked by ComfyUI-Manager's security level: whether ComfyUI's own Python could do it instead, if the person agrees. */ canOverride?: boolean };
@@ -165,6 +175,8 @@ export type MissingPart = {
   part: "encoder" | "vae" | "model" | "vision" | "comfy"; slot?: string; label: string; kind?: string; detail?: string; downloads: PartDownload[];
   nodePack?: NodePackInfo; install?: NodeInstallPlan; autoInstall?: PackAutoInstall; missingNodes?: string[];
   command?: ShellPlan & { target?: string };
+  /** A recommended part that "Don't show again" hides for good (server/dismissals.js). */
+  dismissKey?: string;
 };
 export type ModelDownload = { id: string; file: string; folder?: string; label: string; status: "queued" | "downloading" | "done" | "error" | "canceled" | "paused"; receivedBytes: number; totalBytes: number; bytesPerSecond?: number; already?: boolean; error?: string; finishedAt?: number; /** false when trying again cannot help (full disk, gated file). */ retryable?: boolean; /** Gated: only the browser, logged in to Hugging Face, can fetch it. */ needsBrowser?: boolean; /** Which automatic reconnect this is, while the connection is down. */ reconnecting?: number; /** Gone or gated, and the next build of the same part the server tried instead. */ unavailable?: boolean; fellBackTo?: string; fallbackFrom?: string ; /** All there, being checked against its published SHA-256. */ verifying?: boolean };
 export type DownloadState = { local?: boolean; active: ModelDownload | null; queued: ModelDownload[]; recent: ModelDownload[]; paused?: ModelDownload[]; /** Free bytes where each models folder lands, and which disk that is. */ space?: Record<string, { free: number; disk: string }> };
@@ -198,7 +210,7 @@ export type Health = { ok: boolean; comfyUrl?: string; /** Off: stay on comfyUrl
 export type PreviousExit = { at: number; who: "server" | "vite" | "launcher" | "unknown"; reason: string; code: number | null; signal: string | null; detail?: string; lastSeen?: number };
 /** How a ComfyUI restart ended, as the server saw it: how long it took, and which node packs it brought in or failed to load. */
 export type RestartResult = { startedAt: number; endedAt: number; outcome: 'back' | 'failed'; durationMs?: number | null; newPacks?: string[]; failedPacks?: string[] };
-export type ComfyStatus = { connected: boolean; url?: string; latencyMs?: number; version?: string; device?: string; error?: string; checking?: boolean; checked?: boolean; /** A restart HEISS asked for is under way: not answering is expected. */ restarting?: boolean; restartStartedAt?: number; restartElapsedMs?: number; /** How long restarts usually take here, once they agree. */ restartTypicalMs?: number; /** The restart that ended in the last two minutes. */ lastRestart?: RestartResult; /** ComfyUI turned up at this other usual address, which is now saved. */ found?: string; /** Other addresses on this computer HEISS UI tries by itself. */ nearby?: string[] };
+export type ComfyStatus = { connected: boolean; /** Connected, but its last check went unanswered: loading a model or otherwise working. Runs carry on. */ busy?: boolean; url?: string; latencyMs?: number; version?: string; device?: string; error?: string; checking?: boolean; checked?: boolean; /** A restart HEISS asked for is under way: not answering is expected. */ restarting?: boolean; restartStartedAt?: number; restartElapsedMs?: number; /** How long restarts usually take here, once they agree. */ restartTypicalMs?: number; /** The restart that ended in the last two minutes. */ lastRestart?: RestartResult; /** ComfyUI turned up at this other usual address, which is now saved. */ found?: string; /** Other addresses on this computer HEISS UI tries by itself. */ nearby?: string[] };
 export type UpdateDownload = { status: "downloading" | "verifying" | "unpacking" | "ready" | "error"; version?: string; receivedBytes?: number; totalBytes?: number; error?: string };
 export type UpdateResult = { ok: boolean; rolledBack?: boolean; from?: string; to?: string; error?: string };
 export type UpdateStatus = {
@@ -357,6 +369,10 @@ export type Preferences = {
   inpainting: boolean;
   upscaleQuality: UpscaleQuality;
   autoUpscale: AutoUpscale;
+  /** Settings › Generation: the size menu sets megapixels instead of offering 2K. */
+  megapixelSizing?: boolean;
+  /** The megapixels Default draws every shape at, with megapixelSizing on; unset, each model's own size. */
+  megapixels?: number | null;
   /** Custom sizes kept from the size menu ("Save size"), for every model. */
   savedSizes?: SavedSize[];
   /** Models whose first reference frames the output: edit that image, or only take it as a reference. */

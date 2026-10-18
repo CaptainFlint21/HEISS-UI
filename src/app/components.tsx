@@ -7,8 +7,8 @@ import { Select as FluidSelect, SelectContent as FluidSelectContent, SelectItem 
 import { Tooltip as FluidTooltip } from '@/components/ui/tooltip';
 import { AnimatedNumber } from './AnimatedNumber';
 import type { AspectPreset, AutoUpscale, NativeSupport, Output, Profile, SavedSize } from './types';
-import { presetRatio, type SideLimits } from './sizing';
-import { LinkedSizeFields, SavedSizeRow, SizePreview, SizeTabs, sizeMenuModel, type SizeRow, type SizeTier } from './SizeMenu';
+import { MEGAPIXEL, presetRatio, type SideLimits } from './sizing';
+import { LinkedSizeFields, MegapixelField, SavedSizeRow, SizePreview, SizeTabs, sizeMenuModel, type MegapixelControl, type SizeRow, type SizeTier } from './SizeMenu';
 import { usePresence } from './usePresence';
 import { AnimatePresence, motion } from 'framer-motion';
 import { aspectIconStyle, cn, titleFromPrompt } from './format';
@@ -363,7 +363,7 @@ function triggerShapeStyle(width: number, height: number): React.CSSProperties {
  * and changes the shape. The trigger draws the real shape and says the ratio,
  * with a tag for 2K ("2K") and Custom ("C").
  */
-export function AspectPicker({ value, options, onChange, currentSize, defaultSize, density = "full", tier = "none", tiers = ["none", "custom"], native = {}, sizeMax = 8192, limits, onTierChange, onCustomRatio, onCustomSize, savedSizes = [], onSaveSize, onRenameSize, onRemoveSize, onPickSaved, videoUpscale = "none", onVideoUpscaleChange }: {
+export function AspectPicker({ value, options, onChange, currentSize, defaultSize, density = "full", tier = "none", tiers = ["none", "custom"], native, sizeMax = 8192, limits, onTierChange, onCustomRatio, onCustomSize, savedSizes = [], onSaveSize, onRenameSize, onRemoveSize, onPickSaved, targetArea = 0, megapixel = null, videoUpscale = "none", onVideoUpscaleChange }: {
   value: string;
   options: AspectPreset[];
   onChange: (value: string) => void;
@@ -388,6 +388,9 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
   /** Videos on an NVIDIA RTX card: the RTX upscale every new video gets (server/rtx.js). */
   videoUpscale?: AutoUpscale;
   onVideoUpscaleChange?: (value: AutoUpscale) => void;
+  /** Megapixels in 2K's place (Settings › Generation): Default draws every shape at this area. */
+  targetArea?: number;
+  megapixel?: MegapixelControl | null;
 }) {
   const [open, setOpen] = useState(false);
   const presence = usePresence(open);
@@ -401,7 +404,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
   const [peek, setPeek] = useState(false);
   useEffect(() => { if (!open) { setHovered(null); setPeek(false); } }, [open]);
 
-  const { custom, picked, shown, rows, savedMatch, ownShape, isActive, savedRow, label, badge, what, captionFor, note } = sizeMenuModel({ value, options, currentSize, defaultSize, tier, native, sizeMax, limits, savedSizes });
+  const { custom, picked, shown, rows, savedMatch, ownSize, isActive, savedRow, label, badge, what, captionFor, note } = sizeMenuModel({ value, options, currentSize, defaultSize, tier, native, sizeMax, limits, savedSizes, targetArea, offerTwoK: tiers.includes("2k") });
   const previewRow = hovered;
   const previewSize = previewRow ? previewRow.size : shown;
   const previewLabel = captionFor(previewRow);
@@ -415,7 +418,16 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
     // The exact width, rounded up: offsetWidth rounds down, and a label a fraction too wide would show "…".
     if (open) setHeldWidth((held) => held ?? (triggerRef.current ? Math.ceil(triggerRef.current.getBoundingClientRect().width) : null));
     else if (!presence.mounted) setHeldWidth(null);
-  }, [open, presence.mounted]);
+  }, [open, presence.mounted, heldWidth]);
+  // What the button shows is held too while the menu is open: a tag coming or going (2K, MP, C)
+  // or a new ratio would change its width and move the menu under the pointer. It catches up
+  // once the menu has closed.
+  const [heldFace, setHeldFace] = useState<{ label: string; badge: string; width: number; height: number } | null>(null);
+  React.useLayoutEffect(() => {
+    if (open) setHeldFace((held) => held ?? { label, badge, width: shown.width, height: shown.height });
+    else if (!presence.mounted) setHeldFace(null);
+  }, [open, presence.mounted, label, badge, shown.width, shown.height]);
+  const face = heldFace || { label, badge, width: shown.width, height: shown.height };
   const wasOpen = useRef(false);
   useEffect(() => {
     if (wasOpen.current && !open) {
@@ -438,12 +450,12 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
       <Tip content={`Size: ${what}${rtxLabel}`}><button ref={triggerRef} type="button" data-open-trigger className={cn("aspect-trigger", heldWidth !== null && "is-held")} style={heldWidth ? { width: heldWidth } : undefined} aria-label={`Size: ${what}${rtxLabel}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((next) => !next)}>
           {/* The shape drawn to fit an 18 × 14 box, so every ratio sits in the same slot. */}
           <span className="aspect-shape-slot">
-            <span className="aspect-shape" style={triggerShapeStyle(shown.width, shown.height)} />
-            {badge && density !== "full" ? <b className="aspect-tag is-corner" aria-hidden="true">{badge}</b> : null}
+            <span className="aspect-shape" style={triggerShapeStyle(face.width, face.height)} />
+            {face.badge && density !== "full" ? <b className="aspect-tag is-corner" aria-hidden="true">{face.badge}</b> : null}
           </span>
-          {density === "full" ? <span className="aspect-trigger-label">{label}</span> : null}
+          {density === "full" ? <span className="aspect-trigger-label">{face.label}</span> : null}
           {/* 2K or Custom: a small tag after the ratio; with no label to follow (narrow bars), on the shape's corner. */}
-          {badge && density === "full" ? <b className="aspect-tag" aria-hidden="true">{badge}</b> : null}
+          {face.badge && density === "full" ? <b className="aspect-tag" aria-hidden="true">{face.badge}</b> : null}
           {density === "mini" ? null : <ChevronDown size={14} className={cn(open && "flip")} />}
         </button></Tip>
       {presence.mounted ? (
@@ -455,7 +467,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
           onPointerEnter={(event) => { if (event.pointerType !== "touch") setPeek(true); }}
           onFocusCapture={(event) => { if ((event.target as HTMLElement).matches(":focus-visible, input")) setPeek(true); }}
         >
-          <SizePreview size={previewSize} label={previewLabel} sub={`${previewSize.width} × ${previewSize.height}`} accent={!previewRow && tier !== "none"} shown={peek} />
+          <SizePreview size={previewSize} label={previewLabel} sub={`${previewSize.width} × ${previewSize.height}`} accent={!previewRow && (tier !== "none" || targetArea > 0)} shown={peek} />
           <div className="size-menu-side">
             <div className="aspect-upscale">
               <div className="aspect-upscale-head">
@@ -466,7 +478,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
               <AnimatePresence initial={false}>
                 {custom && limits && onCustomSize ? (
                   <motion.div key="custom" className="size-custom" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
-                    <LinkedSizeFields size={picked} limits={limits} onChange={onCustomSize} onSave={ownShape || savedMatch ? onSaveSize : undefined} saved={Boolean(savedMatch)} />
+                    <LinkedSizeFields size={picked} limits={limits} onChange={onCustomSize} onSave={ownSize || savedMatch ? onSaveSize : undefined} saved={Boolean(savedMatch)} />
                   </motion.div>
                 ) : null}
               </AnimatePresence>
@@ -490,7 +502,9 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
                   aria-selected={isActive(row)}
                   onPointerEnter={(event) => { if (event.pointerType !== "touch") setHovered(row); }}
                   onFocus={(event) => { if (event.currentTarget.matches(":focus-visible")) setHovered(row); }}
-                  onBlur={() => setHovered(null)}
+                  // Only its own preview: pressing another row moves focus there, and the row that
+                  // had it (the chosen one, focused on open) mustn't snap the frame back mid-press.
+                  onBlur={() => setHovered((current) => current?.key === row.key ? null : current)}
                   onClick={() => pick(row)}
                 >
                   <span className="aspect-shape" style={aspectIconStyle(row.shape)} />
@@ -508,11 +522,13 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
                     onPick={() => { onPickSaved(item); if (!custom) setOpen(false); }}
                     onRename={(name) => onRenameSize?.(item.id, name)}
                     onRemove={() => { setHovered(null); onRemoveSize?.(item.id); }}
-                    onPreview={(on) => setHovered(on ? savedRow(item) : null)}
+                    onPreview={(on) => setHovered((current) => on ? savedRow(item) : current?.key === savedRow(item).key ? null : current)}
                   />
                 )) : null}
               </AnimatePresence>
             </div>
+            {/* Under every shape: how big they're all drawn. */}
+            {megapixel ? <MegapixelField current={(shown.width * shown.height) / MEGAPIXEL} control={megapixel} custom={custom} /> : null}
           </div>
         </div>
       ) : null}
@@ -761,6 +777,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, showRapid = t
               <em>{strayCount ? "Add" : "Search"}</em>
             </button>
           ) : null}
+
         </div>
       ) : null}
     </div>

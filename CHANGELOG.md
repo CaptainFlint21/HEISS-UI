@@ -87,32 +87,6 @@ version opens with a `> ` summary line, which the update pill shows.
   is used, files with a known download (HEISS's catalog, ComfyUI-Manager's
   list) download with the import, missing LoRAs are left out, and a missing
   main model can be stood in for by one of the same family you have.
-- **Docker support.** `docker compose up --build` runs the studio in a
-  container next to your ComfyUI, keeping its data on a volume and serving
-  the gallery from ComfyUI's output folder. A plain Dockerfile (multi-stage,
-  non-root, for `docker run` without compose) and the how-to are in
-  [DOCKER.md](./docs/guides/DOCKER.md). The studio is published to this
-  computer only, and settings made in the app are kept on the data volume.
-- **Settings › Connection › Change address › Find ComfyUI on its own.** Off
-  keeps HEISS on its saved address (`HEISS_COMFY_SEARCH=0`): with a second
-  ComfyUI just for HEISS next to your main one on 8188, HEISS no longer
-  switches to the main one while its own is starting or restarting.
-- **Resolution: 2K and 4K drawn by the model itself.** On models made for
-  big pictures (Flux.2, Qwen-Image 2.1, Z-Image, Krea 2 Turbo, Ideogram 4,
-  MageFlow, Sana 2K/4K) the size menu reads **Resolution** with Default, 2K
-  and 4K: the model makes the picture at that size (the aspect you picked,
-  long side 2048 or 4096), faster and with nothing in between, and **Use
-  upscaler** switches to SeedVR2. Elsewhere it stays **Smart upscale**
-  through SeedVR2, with **Draw at 2K directly** where the model may manage
-  it ("Results vary"), and nothing where it plainly breaks (SD 1.5/2). The
-  list and its sources are in
-  [MODELS.md](./docs/guides/MODELS.md#native-2k4k). Picking a SeedVR2 size
-  without SeedVR2 still opens its setup.
-- **A reference that only guides.** On Flux.2 and Qwen-Image 2.1, hover the
-  first reference for Edit or Ref. Edit works as before: the result keeps
-  that image's size. Ref keeps your size and aspect, and the image still
-  guides the picture, 2K/4K included. A REF tag on the thumbnail shows it.
-  The inpainting brush belongs to Edit, so it hides while Ref is on.
 
 ### Changed
 - Visual workflows are converted with subgraphs, bypassed and muted nodes,
@@ -123,28 +97,51 @@ version opens with a `> ` summary line, which the update pill shows.
   partly inside it, where a faint ghost of the original could show. How far
   the repaint and the soft edge reach now follows the size of what you
   painted (after Krita AI's defaults) instead of the crop's size.
-- **A tighter size menu.** Default and the ratio it already is share one
-  row, rows are more compact, and 2.35:1 is gone.
-- **A 2K/4K pick survives a reference.** It is skipped while an edited
-  reference or a painted mask sets the size, and back afterwards, together
-  with the aspect you had.
-- **Time estimates learn each size on its own.** A 2K or 4K draw is estimated
-  from your 2K and 4K runs once there are two, not bent from your 1K ones;
-  a stretch at 2K no longer pushes your 1K timings out, and a few misses at
-  one size no longer hide the estimate at another. Edits and image-to-image
-  runs, and the tiled decode a native size uses, are learned apart too.
+
+## [0.18.0] - 2026-10-17
+
+> Native 2K, a new size menu, FLUX.3 Klein and MOSS-Image
+
+### Added
+- **2K.** Pick 2K in the size menu and the model draws your picture at full
+  size in one go. The menu tells you if a model isn't made for it.
+- **A new size menu.** See the exact size before you make it, set your own
+  width and height, save sizes you use often, or pick a size in megapixels
+  (Settings › Generation).
+- **FLUX.3 Klein.** Black Forest Labs' newest model: fast, sharp, made for 2K,
+  and it can edit from up to three pictures. Its prompt helper turns a short
+  idea into a detailed one; it's recommended, not required.
+- **MOSS-Image.** Great at clear text in pictures. **Guided setup** shows what
+  it still needs.
+- **Edit or Reference.** On Flux.2 and Qwen-Image 2.1, choose whether your
+  first picture gets changed or only guides a new one.
+- **Docker.** Run HEISS with `docker compose up --build`
+  ([how](./docs/guides/DOCKER.md)).
+- **HEISS tells you why it stopped**, if it ever stops on its own.
+
+### Changed
+- **Upscaling moved to the picture.** New pictures aren't upscaled
+  automatically anymore. Use 2K, or the upscale arrow on any picture.
+- **Setup notices changes by itself.** Update ComfyUI or add nodes, and it
+  picks that up without a reload.
+- **Restart shows how it went.**
+- **Several references sit in one chip** and fan out on hover.
+- **Better time estimates** for big pictures.
+- **Generation details** can be copied as text and show your LoRAs.
+- **Find ComfyUI on its own** can be turned off in Settings › Connection.
+
+### Removed
+- Automatic upscaling of every new picture (see above).
+- The viewer's "Vary with a new seed" button.
 
 ### Fixed
-- **Flux.2 Klein 9B picks a Qwen3 8B text encoder that runs it.** MiniMax
-  Music's encoder looks like Qwen3 8B from outside and could become the
-  default, failing every run with "mat1 and mat2 shapes cannot be
-  multiplied". A text encoder saved with the draft that no longer fits
-  falls back to the default instead of failing the run.
-- **Smart upscale finds SeedVR2 weights kept outside ComfyUI/models**, on any
-  folder from `extra_model_paths.yaml`. 4K no longer falls back to an int8
-  build the SeedVR2 node can't load.
-- **Settings › Features › Inpainting says where its two dials are:** in the
-  sidebar's Basics, under the image, not under Advanced.
+- A busy ComfyUI no longer shows as offline.
+- Translators and browser extensions no longer crash the studio.
+- Flux.2 Klein 9B picks a text encoder that works.
+- The size menu stays still while you use it, and shows no 2K note without a
+  model.
+- 4K upscales and restarts on Windows work again.
+- Smaller fixes to references and saved sizes.
 
 ## [0.17.0] - 2026-10-09
 
@@ -1236,7 +1233,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/tristmeister/HEISS-UI/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/tristmeister/HEISS-UI/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.14.0...v0.15.0

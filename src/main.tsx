@@ -1,5 +1,7 @@
+import "./app/domGuard";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { RefreshCw } from "lucide-react";
 import { showToastTone as showToast, toast } from "./app/toast";
 import "./styles.css";
 
@@ -10,7 +12,7 @@ import { apiJson, copyImage, copyText, loadDraft, loadPrefs, referenceAssetFromG
 import { characterMeta, clampText, clientJobUuid, formatElapsed, generationDetailEntries, settingMax, textLength, titleFromPrompt } from './app/format';
 import { useGalleryColumnCount } from './app/gallery';
 import { normalizeLoras, sameBaseModel } from './app/loras';
-import { arrangeReferences, withReference, withoutReferences } from './app/referenceSlots';
+import { arrangeReferences, referenceRoleFor, referenceRoleOffered, withReference, withoutReferences } from './app/referenceSlots';
 import { deleteLoraStack, loraFamilyKey, loraFavorites, loraRecents, loraStacks, recordLoraRecents, rememberActiveLoras, rememberedLoraStrength, rememberLoraStrengths, renameLoraStack, saveLoraStack, startLoraSync, subscribeLoraLibrary, subscribeLoraSync, toggleLoraFavorite, updateLoraStack, type LoraSnapshot, type LoraSyncStatus } from './app/lora-storage';
 import { useConfirmation } from './app/useConfirmation';
 import { StudioView } from './app/StudioView';
@@ -36,8 +38,9 @@ import { useRunSettling } from './app/useRunSettling';
 import { runTitle, type Run } from './app/runs';
 import { useGalleryStore } from './app/useGalleryStore';
 import { emptySearch, searchActive, useFavorites, type GallerySearch } from './app/favorites';
-import { sizePlan, upscaleDisplayThumbnail, upscaleDisplayUrl, upscaleSize, useUpscale } from './app/useUpscale';
-import { closestPreset, fitRatio, snapSide } from './app/sizing';
+import { sizePlan, tiledDecodeFor, upscaleDisplayThumbnail, upscaleDisplayUrl, upscaleSize, useUpscale } from './app/useUpscale';
+import { closestPreset, fitRatio, MEGAPIXEL, sameRatio, snapSide } from './app/sizing';
+import type { MegapixelControl, SizeTier } from './app/SizeMenu';
 import { useHidden, type HiddenIntent } from './app/useHidden';
 import { flyInto, hiddenDockTarget } from './app/hiddenMotion';
 import { useVisibleInterval } from './hooks/use-visible-interval';
@@ -91,6 +94,9 @@ function imageInputsForProfile(profile: Profile | null | undefined): MediaInput[
 
 
 const updateInstalledKey = "heiss-ui:update-installed";
+// A restart this page asked for, so the page it reloads into can say how it went.
+const restartedKey = "heiss-ui:restarted";
+const restartToastId = "heiss-restart";
 const formatUpdateBytes = (bytes = 0) => `${(bytes / 1024 ** 2).toFixed(bytes > 100 * 1024 ** 2 ? 0 : 1)} MB`;
 
 // Another dialog on top owns the keyboard. The viewer is a dialog too, but it is
@@ -313,6 +319,30 @@ function App() {
     }).catch(() => null);
   }, []);
 
+  // After any restart from here: say HEISS UI is back, and for the LAN switch, whether
+  // other devices can now reach it. An update says its own thing above.
+  useEffect(() => {
+    let pending: { at: number; lan?: boolean } | null = null;
+    try { pending = JSON.parse(localStorage.getItem(restartedKey) || "null"); } catch { pending = null; }
+    if (!pending?.at) return;
+    try { localStorage.removeItem(restartedKey); } catch { /* nothing to clear */ }
+    // An old marker (the restart never came back here) says nothing about this page.
+    if (Date.now() - pending.at > 10 * 60 * 1000) return;
+    if (typeof pending.lan !== "boolean") {
+      showToast("HEISS UI restarted", "success");
+      return;
+    }
+    const wanted = pending.lan;
+    apiJson<{ listening: boolean; addresses: string[]; port: number }>("/api/network").then((network) => {
+      if (network.listening === wanted) {
+        const address = network.addresses[0];
+        showToast(wanted ? "Open on other devices" : "Closed to other devices", "success", wanted && address ? { description: `On this network: ${window.location.protocol}//${address}:${window.location.port || network.port}` } : undefined);
+      } else {
+        showToast(wanted ? "Still closed to other devices" : "Still open to other devices", "error", { description: "HEISS UI restarted, but the setting didn’t take. Settings › Connection says why.", duration: Infinity });
+      }
+    }).catch(() => showToast("HEISS UI restarted", "success"));
+  }, []);
+
   // A release download runs on the server; follow it while it is in flight.
   const downloadStage = updateStatus?.download?.status;
   useEffect(() => {
@@ -414,18 +444,24 @@ function App() {
   // without a reload. Only a real offline → online change counts.
   const wasConnected = useRef<boolean | null>(null);
   const [comfyReconnectedAt, setComfyReconnectedAt] = useState(0);
+  // A new ComfyUI version counts too: an update and restart can fall between two checks
+  // without ever looking offline, and what it runs may have changed (a model it couldn't before).
+  const lastComfyVersion = useRef("");
   useEffect(() => {
     if (!comfyStatus.checked) return;
     const previous = wasConnected.current;
     wasConnected.current = comfyStatus.connected;
-    if (previous !== false || !comfyStatus.connected) return;
+    const version = comfyStatus.connected ? comfyStatus.version || "" : "";
+    const updated = Boolean(version && lastComfyVersion.current && version !== lastComfyVersion.current);
+    if (version) lastComfyVersion.current = version;
+    if (!updated && (previous !== false || !comfyStatus.connected)) return;
     refreshModels(false);
     refreshWorkflows();
     refreshHealth();
     refreshHardware();
     refreshUpscaleStatus(prefs.upscaleQuality, { fresh: true });
     setComfyReconnectedAt(Date.now());
-  }, [comfyStatus.connected, comfyStatus.checked]);
+  }, [comfyStatus.connected, comfyStatus.checked, comfyStatus.version]);
 
   // A restart HEISS asked for: every surface says "restarting", the poll speeds
   // up so ComfyUI's return shows at once, and a restart that never comes back
@@ -1023,18 +1059,21 @@ function App() {
    * Restarts HEISS UI through its launcher (which also swaps in a downloaded
    * update), then reloads the page once the new server answers.
    */
-  async function restartHeiss({ update = false } = {}) {
+  async function restartHeiss({ update = false, lan }: { update?: boolean; lan?: boolean } = {}) {
     const at = Date.now();
     try {
       await apiJson("/api/update/restart", { method: "POST" });
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Couldn’t restart HEISS UI", "error", { action: { label: "Try again", onClick: () => restartHeiss({ update }) } });
+      showToast(error instanceof Error ? error.message : "Couldn’t restart HEISS UI", "error", { id: restartToastId, duration: Infinity, action: { label: "Try again", onClick: () => restartHeiss({ update, lan }) } });
       return false;
     }
     // A downloaded update goes in with any restart, so say so when the page comes back.
-    if (update || updateStatus?.download?.status === "ready") {
-      try { localStorage.setItem(updateInstalledKey, JSON.stringify({ at })); } catch { /* the toast just won't show */ }
-    }
+    const withUpdate = update || updateStatus?.download?.status === "ready";
+    try {
+      if (withUpdate) localStorage.setItem(updateInstalledKey, JSON.stringify({ at }));
+      else localStorage.setItem(restartedKey, JSON.stringify({ at, ...(typeof lan === "boolean" ? { lan } : {}) }));
+    } catch { /* the toast just won't show */ }
+    showToast(withUpdate ? "Installing the update…" : "Restarting HEISS UI…", "default", { id: restartToastId, duration: Infinity, description: "This page reloads when it’s back.", glyph: <RefreshCw size={16} className="spin" /> });
     setRestarting(true);
     // Wait for a server that started after the restart, then load its new page.
     const deadline = at + 3 * 60 * 1000;
@@ -1043,7 +1082,8 @@ function App() {
       if (data?.startedAt && data.startedAt >= at) { window.location.reload(); return; }
       if (Date.now() > deadline) {
         setRestarting(false);
-        showToast("HEISS UI didn’t come back. Start it again with its launcher.", "error", { duration: Infinity, action: { label: "Reload", onClick: () => window.location.reload() } });
+        try { localStorage.removeItem(restartedKey); } catch { /* nothing to clear */ }
+        showToast("HEISS UI didn’t come back", "error", { id: restartToastId, description: "Start it again with its launcher, then reload.", duration: Infinity, action: { label: "Reload", onClick: () => window.location.reload() } });
         return;
       }
       window.setTimeout(poll, 1000);
@@ -1166,9 +1206,11 @@ function App() {
   function chooseSizeTier(tier: "none" | "2k" | "custom") {
     if (tier === "custom") {
       if (customSize) return;
-      const shown = sizePlan(sizeTier, width, height, currentProfile?.native, sizeMax).final;
-      setWidth(snapSide(shown.width, customLimits.width));
-      setHeight(snapSide(shown.height, customLimits.height));
+      const shown = sizePlan(sizeTier, width, height, currentProfile?.native, sizeMax, sizeArea, customLimits.width.step).final;
+      // Fitted as a whole, not side by side, so a side at Custom's limit doesn't reshape it.
+      const fitted = fitRatio(shown.width / shown.height, shown.width * shown.height, customLimits.width, customLimits.height, 16);
+      setWidth(fitted.width);
+      setHeight(fitted.height);
       setCustomSize(true);
       return;
     }
@@ -1179,7 +1221,8 @@ function App() {
       if (preset) { setWidth(preset.w); setHeight(preset.h); }
       setCustomSize(false);
     }
-    chooseAutoUpscale(tier);
+    // With Megapixels in 2K's place there's no 2K to choose: leave the saved pick for when it's back.
+    if (!megapixelMode) chooseAutoUpscale(tier);
   }
   /** A ratio row while in Custom: that shape at about the same area. */
   function applyCustomRatio(ratio: number) {
@@ -1195,11 +1238,19 @@ function App() {
      this page comes back into view. */
   const [savedSizes, setSavedSizesState] = useState<SavedSize[]>([]);
   const savedSizesRef = useRef<SavedSize[]>([]);
+  // The ids last had from the server: sent with each save, so one another device added since is kept, not overwritten.
+  const serverSizeIdsRef = useRef<string[]>([]);
   function updateSavedSizes(change: (current: SavedSize[]) => SavedSize[]) {
     const next = change(savedSizesRef.current);
     savedSizesRef.current = next;
     setSavedSizesState(next);
-    apiJson<{ sizes: SavedSize[] }>("/api/sizes", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ sizes: next }) })
+    apiJson<{ sizes: SavedSize[] }>("/api/sizes", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ sizes: next, base: serverSizeIdsRef.current }) })
+      .then((data) => {
+        if (!Array.isArray(data.sizes)) return;
+        serverSizeIdsRef.current = data.sizes.map((item) => item.id);
+        // Another device's sizes come in with the answer, unless this page changed again meanwhile.
+        if (savedSizesRef.current === next) { savedSizesRef.current = data.sizes; setSavedSizesState(data.sizes); }
+      })
       .catch(() => showToast("Couldn’t save your sizes", "error", { description: "They’re kept on this page until it reloads." }));
   }
   useEffect(() => {
@@ -1207,6 +1258,7 @@ function App() {
     const load = () => apiJson<{ sizes: SavedSize[] }>("/api/sizes").then((data) => {
       if (!alive) return;
       const sizes = Array.isArray(data.sizes) ? data.sizes : [];
+      serverSizeIdsRef.current = sizes.map((item) => item.id);
       // Sizes saved in this browser before they lived on the server move over, once.
       const local = loadPrefs().savedSizes || [];
       if (local.length) {
@@ -1258,7 +1310,9 @@ function App() {
     });
   }
   function pickSavedSize(saved: SavedSize) {
-    const fitted = { width: snapSide(saved.width, customLimits.width), height: snapSide(saved.height, customLimits.height) };
+    const snapped = { width: snapSide(saved.width, customLimits.width), height: snapSide(saved.height, customLimits.height) };
+    // Past this model's limits: its shape at the largest size that fits, not each side cut on its own (a 2:1 turned 4:3).
+    const fitted = sameRatio(snapped, saved) ? snapped : fitRatio(saved.width / saved.height, saved.width * saved.height, customLimits.width, customLimits.height, 16);
     setCustomDimensions(fitted);
     if (fitted.width !== saved.width || fitted.height !== saved.height) {
       showToast(`“${saved.name}” fitted to this model: ${fitted.width} × ${fitted.height}`, "default", { description: `It’s saved as ${saved.width} × ${saved.height}, past what ${currentProfile?.displayName || currentProfile?.label || "this model"} takes.` });
@@ -1369,8 +1423,9 @@ function App() {
   const framingReference = currentProfile?.aspectPolicy === "reference"
     ? composerReferenceAssets.find((item) => item.slot === referenceInput?.id)?.asset || null
     : null;
-  // Only an image being edited frames the output; a painted mask always edits it.
-  const referenceRole: ReferenceRole = activeInpaintMask ? "edit" : prefs.referenceRole === "reference" ? "reference" : "edit";
+  // Only an image being edited frames the output; a painted mask always edits it, and so does
+  // a model without the switch, whatever was picked on another.
+  const referenceRole: ReferenceRole = referenceRoleFor(currentProfile, prefs.referenceRole, Boolean(activeInpaintMask));
   const referenceForAspect = referenceRole === "edit" ? framingReference : null;
   const aspectLocked = Boolean(referenceForAspect && referenceForAspect.width > 0 && referenceForAspect.height > 0);
   // The size picked before a reference took over, put back when it lets go (same model only).
@@ -1411,10 +1466,32 @@ function App() {
   const promptEnhance = usePromptEnhance({ prompt, setPrompt, mode, profile: currentProfile, imageId: referenceAsset?.id || "", limit: promptLimit, showToast, focus: focusPrompt });
   const profileOptions = currentProfile?.options || {};
   const aspectValue = `${width}x${height}`;
+  /* Megapixels (Settings › Generation) takes 2K's place, for images: Default draws every shape
+     at that many pixels (the presets stay what's picked, as with 2K), and the menu's field in
+     Custom rescales the size you have, keeping its shape. Unset, each model keeps its own size. */
+  const megapixelMode = mode === "image" && Boolean(prefs.megapixelSizing);
+  // As far as the model's sides reach (4096 at most, as in Custom), and no further than 16.
+  const megapixelMax = Math.max(1, Math.min(16, Math.floor((Math.min(Number(widthMeta.max) || 8192, Number(heightMeta.max) || 8192, 4096) ** 2) / MEGAPIXEL)));
+  // A target from a model that went further is held to this one's reach, in the field as in the run.
+  const megapixelTarget = megapixelMode && Number(prefs.megapixels) > 0 ? Math.min(Number(prefs.megapixels), megapixelMax) : null;
+  const sizeArea = megapixelTarget && !customSize ? megapixelTarget * MEGAPIXEL : 0;
+  const sizeTiers: SizeTier[] = mode === "image" && !megapixelMode ? ["none", "2k", "custom"] : ["none", "custom"];
   // The size menu's tab: Custom is the size as typed; Default and 2K start from a preset (2K for images only).
-  const sizeTier: AutoUpscale = customSize || mode !== "image" ? "none" : upscaleSize(prefs.autoUpscale);
+  const sizeTier: AutoUpscale = customSize || mode !== "image" || megapixelMode ? "none" : upscaleSize(prefs.autoUpscale);
   const sizeMax = Math.min(Number(widthMeta.max) || 8192, Number(heightMeta.max) || 8192);
   const customLimits = { width: customSideLimits(widthMeta), height: customSideLimits(heightMeta) };
+  const megapixelControl: MegapixelControl | null = megapixelMode ? {
+    target: megapixelTarget,
+    max: megapixelMax,
+    onChange: (value: number) => {
+      setPrefs({ megapixels: value });
+      if (!customSize) return;
+      const size = fitRatio(width / height, value * MEGAPIXEL, customLimits.width, customLimits.height, 16);
+      setWidth(size.width);
+      setHeight(size.height);
+    },
+    onReset: () => setPrefs({ megapixels: null })
+  } : null;
   const defaultAspectSize = `${Number(currentProfile?.defaults.width || (mode === "video" ? 512 : 1024))}x${Number(currentProfile?.defaults.height || (mode === "video" ? 288 : 1024))}`;
   const aspectPickerValue = aspectValue === defaultAspectSize ? "default" : customSize || !aspectOptions.some((item) => item.value === aspectValue) ? "free" : aspectValue;
   const galleryColumnCount = useGalleryColumnCount();
@@ -1437,14 +1514,16 @@ function App() {
   const estimateCount = mode === "image" && currentProfile?.capabilities?.variations === false ? 1 : count;
   const separateRuns = mode === "image" && prefs.variationQueueMode === "separate";
   // Estimated the way generate() sends it: at the size it's drawn at.
-  const estimateSize = sizePlan(sizeTier, Number(width), Number(height), currentProfile?.native, sizeMax).draw || { width, height };
+  // Not where generate() skips the plan: a mask, or an edited reference that sets the size.
+  const estimatePlan = mode === "image" && !activeInpaintMask && !referenceForAspect ? sizePlan(sizeTier, Number(width), Number(height), currentProfile?.native, sizeMax, sizeArea, customLimits.width.step) : null;
+  const estimateSize = estimatePlan?.draw || { width, height };
   const generationEstimate = useGenerationEstimate({
     mode, model: currentProfile?.model || model, profileId: currentProfile?.id || model, family: currentProfile?.family || '', width: estimateSize.width, height: estimateSize.height, steps,
     count: separateRuns ? 1 : estimateCount, runs: separateRuns ? estimateCount : 1, frames: mode === "video" ? frames : 0, revision: runningCount,
     rapid: rapid.use,
     guidance: rapid.guidance,
     // Learned apart on the server: runs that read images, and a native size's tiled decode.
-    refs: composerReferenceAssets.length, tiled: estimateSize.width !== width || estimateSize.height !== height
+    refs: composerReferenceAssets.length, tiled: tiledDecodeFor(estimatePlan)
   });
   // Every Restart ComfyUI button asks first when it would stop running work.
   useEffect(() => {
@@ -1648,7 +1727,7 @@ function App() {
 
   const generationActions = useGenerationActions({
     workflowSettings: currentWorkflowSettings,
-    active, canUseStartImage, confirmAction, count, currentProfile, denoise, frames, fps, generateDisabled, generatePostingRef, height, loadGallery, loadGalleryDelta, loras, missingRequiredReference, mode, model, negative, prefs, hiddenSpace, hidden, prompt, referenceAssets: composerReferenceAssets, inpaint: activeInpaintMask ? { mask: activeInpaintMask.dataUrl, strength: inpaintStrength, feather: inpaintFeather } : null, sampler, scheduler, seed, setActive, setGallery, upsertGalleryItems, removeGalleryItems, removeGalleryItemsWhere, patchGalleryItems, setStatus, setZenSelectedId, showToast, startImage, startImageId, startImageName, steps, cfg, textEncoder, textEncoders, vae, clipType, weightDtype, width, visibleGallery, outputDir: paths.outputDir, generateDisabledReason, comfyOffline: Boolean(comfyStatus.checked && !comfyStatus.connected && !comfyStatus.checking), comfyRestarting: Boolean(comfyStatus.restarting),
+    active, canUseStartImage, confirmAction, count, currentProfile, denoise, frames, fps, generateDisabled, generatePostingRef, height, loadGallery, loadGalleryDelta, loras, missingRequiredReference, mode, model, negative, prefs, hiddenSpace, hidden, prompt, referenceAssets: composerReferenceAssets, inpaint: activeInpaintMask ? { mask: activeInpaintMask.dataUrl, strength: inpaintStrength, feather: inpaintFeather } : null, sizeTier, sizeMax, sizeArea, sizeStep: customLimits.width.step, sampler, scheduler, seed, setActive, setGallery, upsertGalleryItems, removeGalleryItems, removeGalleryItemsWhere, patchGalleryItems, setStatus, setZenSelectedId, showToast, startImage, startImageId, startImageName, steps, cfg, textEncoder, textEncoders, vae, clipType, weightDtype, width, visibleGallery, outputDir: paths.outputDir, generateDisabledReason, comfyOffline: Boolean(comfyStatus.checked && !comfyStatus.connected && !comfyStatus.checking), comfyRestarting: Boolean(comfyStatus.restarting),
     openModelSetup: () => setWorkflowGalleryOpen(true),
     retryComfyStatus,
     refreshModels
@@ -1751,7 +1830,7 @@ function App() {
   // The same settings as the sidebar, laid out for the phone's Advanced sheet.
   const phoneAdvancedControls = <StablePhoneAdvancedControls view={sidebarView} />;
 
-  const baseView = { viewerGallery, gallerySearch, setGallerySearch, toggleFavorite, seed, setSeed, galleryGroups, settleVersion, stackRuns, openRuns, setRunOpen, unstackRun, active, applyAllSettings, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, sizeTier, sizeMax, customLimits, chooseSizeTier, applyCustomRatio, setCustomDimensions, savedSizes, saveCustomSize, renameSavedSize, removeSavedSize, pickSavedSize, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, checkForUpdates, restartForUpdate, restartHeiss, restarting, justUpdated, clearJustUpdated: () => setJustUpdated(""), setUpdatePrefs, refreshUpdateStatus, confirmAction, clearAllCache, clearFailedItems, clearGallery, clickViewer, comfyStatus, copyToClipboard, copyItemToClipboard, count, countMeta, currentProfile, customSize, deleteItem, deleteItems, doneGallery, zenGallery, gallery, galleryColumnCount, galleryLoaded, galleryCrossing, galleryRevision, galleryStageRef, galleryTotalApprox, generate, generateDisabled, generateDisabledReason, goLatestZen, hasMoreGallery, health, height, heightMeta, importWorkflowFile, installUpdate, isDraggingViewer, isMobile, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, now, onGalleryScroll, openItem, openOutputFolder, paths, prefs, hidden, hiddenSpace, hideItems, unhideItems, profileBadges, prompt, promptLimit, referenceAsset, referenceInput, refreshComfyStatus, retryComfyStatus, comfyRetrying, comfyReconnectedAt, refreshHealth, refreshModels, refreshWorkflows, removeReferenceAsset, renderedGallery, resetAllSettings, resetViewer, runningCount, saveOutputDirectory, selectReferenceAsset, selectWorkflow, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowGenerationSettings, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setWorkflowPreferences, setWorkflows, setZenControls, setZenGalleryOpen, setZenMode, showDetails, showGenerationSettings, showNegativePrompt, showToast, sidebarControls, phoneAdvancedControls, startViewerDrag, startViewerTouch, status, steps, stepsMeta, stopViewerDrag, submitZenPrompt, touchGestureRef, updateBusy, updateStatus, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, workflowPreferences, workflows, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenSelectedId, zenStripDragRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, characterMeta, formatElapsed, generationDetailEntries, titleFromPrompt , zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, settings, setPrefs, upscaleStatus, upscaleUnavailableReason, upscaleSetup, upscaleInstall, upscaleBusyIds, upscaleNotices, dismissUpscaleNotice, toggleUpscale, cancelUpscale, refreshUpscaleStatus, cancelUpscaleInstall, activateUpscale, chooseAutoUpscale, upscaleDisplayUrl, modelFolders, generationEstimate, openLoras: () => { setSidebarTab('loras'); setZenControls(true); }, fillPrompt, surprise: () => fillPrompt(surprisePrompt(prompt, mode)), starterPrompts, onStarterStarted: rememberStarter, selectStarterModel, generateKey: generateShortcut(prefs.enterToGenerate), failureFixes: generationActions.failureFixes };
+  const baseView = { viewerGallery, gallerySearch, setGallerySearch, toggleFavorite, seed, setSeed, galleryGroups, settleVersion, stackRuns, openRuns, setRunOpen, unstackRun, active, applyAllSettings, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, sizeTier, sizeTiers, sizeArea, megapixelControl, sizeMax, customLimits, chooseSizeTier, applyCustomRatio, setCustomDimensions, savedSizes, saveCustomSize, renameSavedSize, removeSavedSize, pickSavedSize, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, checkForUpdates, restartForUpdate, restartHeiss, restarting, justUpdated, clearJustUpdated: () => setJustUpdated(""), setUpdatePrefs, refreshUpdateStatus, confirmAction, clearAllCache, clearFailedItems, clearGallery, clickViewer, comfyStatus, copyToClipboard, copyItemToClipboard, count, countMeta, currentProfile, customSize, deleteItem, deleteItems, doneGallery, zenGallery, gallery, galleryColumnCount, galleryLoaded, galleryCrossing, galleryRevision, galleryStageRef, galleryTotalApprox, generate, generateDisabled, generateDisabledReason, goLatestZen, hasMoreGallery, health, height, heightMeta, importWorkflowFile, installUpdate, isDraggingViewer, isMobile, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, now, onGalleryScroll, openItem, openOutputFolder, paths, prefs, hidden, hiddenSpace, hideItems, unhideItems, profileBadges, prompt, promptLimit, referenceAsset, referenceInput, refreshComfyStatus, retryComfyStatus, comfyRetrying, comfyReconnectedAt, refreshHealth, refreshModels, refreshWorkflows, removeReferenceAsset, renderedGallery, resetAllSettings, resetViewer, runningCount, saveOutputDirectory, selectReferenceAsset, selectWorkflow, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowGenerationSettings, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setWorkflowPreferences, setWorkflows, setZenControls, setZenGalleryOpen, setZenMode, showDetails, showGenerationSettings, showNegativePrompt, showToast, sidebarControls, phoneAdvancedControls, startViewerDrag, startViewerTouch, status, steps, stepsMeta, stopViewerDrag, submitZenPrompt, touchGestureRef, updateBusy, updateStatus, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, workflowPreferences, workflows, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenSelectedId, zenStripDragRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, characterMeta, formatElapsed, generationDetailEntries, titleFromPrompt , zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, settings, setPrefs, upscaleStatus, upscaleUnavailableReason, upscaleSetup, upscaleInstall, upscaleBusyIds, upscaleNotices, dismissUpscaleNotice, toggleUpscale, cancelUpscale, refreshUpscaleStatus, cancelUpscaleInstall, activateUpscale, chooseAutoUpscale, upscaleDisplayUrl, modelFolders, generationEstimate, openLoras: () => { setSidebarTab('loras'); setZenControls(true); }, fillPrompt, surprise: () => fillPrompt(surprisePrompt(prompt, mode)), starterPrompts, onStarterStarted: rememberStarter, selectStarterModel, generateKey: generateShortcut(prefs.enterToGenerate), failureFixes: generationActions.failureFixes };
 
   // Painting on the first reference, for a model that can inpaint (InpaintStudio.tsx).
   const referenceInpaint: ReferenceInpaint | null = canInpaint && referenceInput && referenceAsset ? {
@@ -1763,11 +1842,13 @@ function App() {
   const refreshForNodes = useRef(() => {});
   refreshForNodes.current = () => { refreshModels(false); refreshWorkflows(); loadRtxStatus({ fresh: true }); };
   useEffect(() => onHeissNodesReady(() => refreshForNodes.current()), []);
-  // The switch shows on the framing reference, once one is there; a painted mask settles it as an edit.
-  const referenceRoleControl: ReferenceRoleControl | null = currentProfile?.aspectPolicy === "reference" && String(currentProfile.workflow || "").startsWith("family:") && referenceInput && framingReference && !activeInpaintMask ? {
+  // The switch shows on the framing reference, once one is there. A painted mask settles it as an
+  // edit: it stays, locked on Edit, so the chips say so (EDIT, the others greyed, no +).
+  const referenceRoleControl: ReferenceRoleControl | null = referenceRoleOffered(currentProfile) && referenceInput && framingReference ? {
     slot: referenceInput.id,
     value: referenceRole,
-    onChange: (value: ReferenceRole) => setPrefs({ referenceRole: value })
+    locked: Boolean(activeInpaintMask),
+    onChange: (value: ReferenceRole) => { if (!activeInpaintMask) setPrefs({ referenceRole: value }); }
   } : null;
   const view = { ...baseView, loraMismatch, dismissLoraMismatch, setupTip, hideSetupTip, neverSetupTip, referenceAssets: composerReferenceAssets, referenceInputs: visibleReferenceInputs, referenceInpaint, referenceRole: referenceRoleControl, promptEnhance: prefs.promptEnhance === false ? null : promptEnhance };
   return (

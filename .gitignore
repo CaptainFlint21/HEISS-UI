@@ -31,3 +31,6 @@ data
 # Pinokio downloads the runnable source checkout here.
 /app/
 bench-results/
+
+# Size-picker demo recordings (local only)
+docs/screenshots/size-picker*

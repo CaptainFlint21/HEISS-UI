@@ -3,6 +3,7 @@ import { ApiError, apiJson } from './api';
 import type { AutoUpscale, GalleryItem, NativeSize, NativeSupport, Preferences, UpscaleInstall, UpscaleQuality, UpscaleStatus } from './types';
 import type { ShowToast } from './toast';
 import { mediaUrl } from './mediaUrl';
+import { fitRatio } from './sizing';
 import { formatLeft, useRunClock } from './GenerationProgress';
 import { loadRtxStatus, rtxOffered } from './rtx';
 import { requireHeissNodes } from './heissNodes';
@@ -119,21 +120,48 @@ export type SizePlan = {
   final: Size;
   /** The model isn't known to draw this size well ("maybe" or nothing in its catalog entry). */
   untested: boolean;
-  /** The model's max side kept it under 2K. */
+  /** The model's max side kept it under 2K, or short of the megapixels asked for. */
   capped: boolean;
+  /** That max side, for saying so. */
+  maxSide: number;
 };
 
 /**
  * How a run reaches its tab: Default is the picked preset as it is; 2K draws
  * that aspect with its long side at 2048, the model itself, no upscale after.
+ * With `area` (Settings › Generation › Megapixels, which takes 2K's place),
+ * Default draws the picked aspect at that many pixels instead, in the model's steps (16 at least).
  */
-export function sizePlan(tier: AutoUpscale | undefined, width: number, height: number, native: NativeSupport = {}, max = 8192): SizePlan {
+export function sizePlan(tier: AutoUpscale | undefined, width: number, height: number, native: NativeSupport = {}, max = 8192, area = 0, step = 16): SizePlan {
   const size = upscaleSize(tier);
   const picked = { width, height };
-  const plain: SizePlan = { size, draw: null, final: picked, untested: false, capped: false };
+  const plain: SizePlan = { size, draw: null, final: picked, untested: false, capped: false, maxSide: max };
+  if (size === "none" && area > 0 && width > 0 && height > 0) {
+    // No side past 4096, as in Custom, so taking the size into Custom never reshapes it.
+    const side = { min: 64, max: Math.min(max, 4096), step: Math.max(16, step) };
+    const draw = fitRatio(width / height, area, side, side, side.step);
+    if (draw.width === width && draw.height === height) return plain;
+    // Short of the area asked for because the shape at that area would need a side past the max.
+    // (Fitting the shape can stop a step or more under the max, so the drawn size can't tell.)
+    const ratio = width / height;
+    const capped = draw.width * draw.height < area * 0.97 && Math.max(Math.sqrt(area * ratio), Math.sqrt(area / ratio)) > side.max;
+    // Past about 2.5 MP a model not made for 2K is on the same unknown ground as 2K.
+    const untested = draw.width * draw.height > 2.5 * 1024 * 1024 && native["2k"] !== "yes";
+    return { size, draw, final: draw, untested, capped, maxSide: side.max };
+  }
   if (size === "none" || !(width > 0) || !(height > 0) || Math.max(width, height) >= 2048) return plain;
   const draw = drawnAt(picked, 2048, max);
-  return { size, draw, final: draw, untested: native["2k"] !== "yes", capped: Math.max(draw.width, draw.height) < 2048 };
+  return { size, draw, final: draw, untested: native["2k"] !== "yes", capped: Math.max(draw.width, draw.height) < 2048, maxSide: max };
+}
+
+/**
+ * Whether a run's draw decodes in tiles: every 2K draw (a whole-frame decode at that size can
+ * outgrow VRAM and crawl in shared memory without failing), and a megapixel draw from about
+ * 2K up. Generate and its time estimate both ask here, so the estimate is learned from like runs.
+ */
+export function tiledDecodeFor(plan: SizePlan | null) {
+  if (!plan?.draw) return false;
+  return plan.size === "2k" || plan.draw.width * plan.draw.height >= 2048 * 1152;
 }
 
 export function upscaleQualityLabel(quality = "balanced") {

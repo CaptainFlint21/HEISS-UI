@@ -11,7 +11,7 @@ import { EnhanceButton } from './EnhanceComposer';
 import type { EnhancePhase } from './usePromptEnhance';
 import type { AspectPreset, AutoUpscale, MediaInput, Profile, SavedSize, ReferenceAsset, ReferenceInpaint, ReferenceRoleControl, SelectedReferenceAsset } from './types';
 import { estimatePhrase, formatAbout, type GenerationEstimate } from './useGenerationEstimate';
-import type { SizeTier } from './SizeMenu';
+import type { MegapixelControl, SizeTier } from './SizeMenu';
 import type { SideLimits } from './sizing';
 
 /* ---------------------------------------------------------------------------
@@ -224,6 +224,10 @@ export type ComposerBarProps = {
   applyAspect: (value: string) => void;
   /** The size menu's tab (Default · 2K · Custom), and what Custom may be. */
   sizeTier?: SizeTier;
+  /** The tabs on offer: 2K, or Megapixels in its place (Settings › Generation). */
+  sizeTiers?: SizeTier[];
+  sizeArea?: number;
+  megapixelControl?: MegapixelControl | null;
   sizeMax?: number;
   customLimits?: { width: SideLimits; height: SideLimits };
   chooseSizeTier?: (tier: SizeTier) => void;
@@ -295,7 +299,7 @@ export type ComposerBarProps = {
 export function ComposerBar(props: ComposerBarProps) {
   const {
     models, model, modelProfiles, showInpaint = true, showRapid = true, profileBadges, chooseModel, modelMenu, currentProfile, comfyOffline, comfyRestarting = false, onFindModels, onGetModels, strayModelCount, mode,
-    aspectPickerValue, aspectOptions, aspectValue, defaultAspectSize, applyAspect, sizeTier = "none", sizeMax, customLimits, chooseSizeTier, applyCustomRatio, setCustomDimensions, savedSizes, saveCustomSize, renameSavedSize, removeSavedSize, pickSavedSize, videoUpscale = "none", onVideoUpscaleChange,
+    aspectPickerValue, aspectOptions, aspectValue, defaultAspectSize, applyAspect, sizeTier = "none", sizeTiers, sizeArea = 0, megapixelControl = null, sizeMax, customLimits, chooseSizeTier, applyCustomRatio, setCustomDimensions, savedSizes, saveCustomSize, renameSavedSize, removeSavedSize, pickSavedSize, videoUpscale = "none", onVideoUpscaleChange,
     customSize, aspectLocked = false, width, widthMeta, setWidth, height, heightMeta, setHeight,
     steps, stepsMeta, setSteps, count, countMeta, setCount, loraActiveCount,
     hiddenSpace, onOpenLoras,
@@ -329,7 +333,9 @@ export function ComposerBar(props: ComposerBarProps) {
       defaultSize={defaultAspectSize}
       density={density}
       tier={sizeTier}
-      tiers={mode === "image" ? ["none", "2k", "custom"] : ["none", "custom"]}
+      tiers={sizeTiers || (mode === "image" ? ["none", "2k", "custom"] : ["none", "custom"])}
+      targetArea={sizeArea}
+      megapixel={megapixelControl}
       native={currentProfile?.native}
       sizeMax={sizeMax}
       limits={customLimits}

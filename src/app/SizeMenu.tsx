@@ -3,7 +3,7 @@ import { Check, Link2, Pencil, Trash2, Unlink2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { aspectIconStyle, cn } from './format';
 import { Tip } from './components';
-import { fitRatio, megapixels, parseSize, presetRatio, ratioName, sameRatio, snapSide, type SideLimits, type Size } from './sizing';
+import { fitRatio, formatMp, MEGAPIXEL, megapixels, parseSize, presetRatio, ratioName, sameRatio, snapSide, type SideLimits, type Size } from './sizing';
 import { sizePlan } from './useUpscale';
 import type { AspectPreset, NativeSupport, SavedSize } from './types';
 
@@ -32,7 +32,7 @@ export type SizeRow = { key: string; value: string; label: string; small?: strin
  * at 2048. Custom is any width and height; a shape row there keeps the area
  * and changes the shape.
  */
-export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, native = {}, sizeMax = 8192, limits, savedSizes = [] }: {
+export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, native: modelNative, sizeMax = 8192, limits, savedSizes = [], targetArea = 0, offerTwoK = true }: {
   value: string;
   options: AspectPreset[];
   currentSize: string;
@@ -42,10 +42,16 @@ export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, 
   sizeMax?: number;
   limits?: { width: SideLimits; height: SideLimits };
   savedSizes?: SavedSize[];
+  /** Megapixels in 2K's place: Default draws each shape at this many pixels (0: as the model has it). */
+  targetArea?: number;
+  /** 2K is a tab here (not with Megapixels, nor for video): its sizes are already a click away. */
+  offerTwoK?: boolean;
 }) {
   const custom = tier === "custom";
+  // No model picked (ComfyUI off, or none listed): sizes still work, but there is no model to warn about.
+  const native = modelNative || {};
   const picked = parseSize(currentSize);
-  const plan = sizePlan(tier === "2k" ? "2k" : "none", picked.width, picked.height, native, sizeMax);
+  const plan = sizePlan(tier === "2k" ? "2k" : "none", picked.width, picked.height, native, sizeMax, custom ? 0 : targetArea, limits?.width.step);
   const shown = custom ? picked : plan.final;
   const selected = options.find((item) => item.value === value);
   const isDefault = value === "default";
@@ -57,7 +63,8 @@ export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, 
   // What each row makes on this tab: the preset, the preset at 2K, or its shape at Custom's area.
   const rowSize = (shape: AspectPreset) => custom && limits
     ? fitRatio(presetRatio(shape), area, limits.width, limits.height, 16)
-    : tier === "2k" ? sizePlan("2k", shape.w, shape.h, native, sizeMax).final : { width: shape.w, height: shape.h };
+    : tier === "2k" ? sizePlan("2k", shape.w, shape.h, native, sizeMax).final
+    : targetArea > 0 ? sizePlan("none", shape.w, shape.h, native, sizeMax, targetArea, limits?.width.step).final : { width: shape.w, height: shape.h };
   const defaultPreset: AspectPreset = defaultOption || { label: ratioName(defaultShape.width, defaultShape.height), value: defaultSize, w: defaultShape.width, h: defaultShape.height };
   const rows: SizeRow[] = [
     { key: "default", value: "default", label: "Default", small: defaultPreset.label, shape: defaultPreset, size: rowSize(defaultPreset) },
@@ -66,21 +73,29 @@ export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, 
   // In Custom a saved size that is exactly this one is the pick, rather than the shape it shares.
   const savedMatch = custom ? savedSizes.find((item) => item.width === picked.width && item.height === picked.height) : undefined;
   const isActive = (row: SizeRow) => custom ? !savedMatch && sameRatio(row.size, shown) : row.value === value;
-  // "Save size" is for a shape of your own: one no preset row has (within 0.5%), not a preset made bigger or smaller.
-  const ownShape = custom && !rows.some((row) => Math.abs(picked.width / picked.height / presetRatio(row.shape) - 1) <= 0.005);
+  // "Save size" is for a size of your own: any shape at any size, except one Default or 2K already
+  // gives (a preset row at either tier, within a snap step a side), which is a click away as it is.
+  const offered = custom ? rows.flatMap((row) => [{ width: row.shape.w, height: row.shape.h }, ...(offerTwoK ? [sizePlan("2k", row.shape.w, row.shape.h, native, sizeMax).final] : [])]) : [];
+  const near = (a: Size, b: Size) => Math.abs(a.width - b.width) <= 16 && Math.abs(a.height - b.height) <= 16;
+  const ownSize = custom && !offered.some((size) => near(size, picked));
   const savedRow = (item: SavedSize): SizeRow => ({ key: item.id, value: "", label: item.name, small: ratioName(item.width, item.height), shape: { label: "", value: "", w: item.width, h: item.height }, size: { width: item.width, height: item.height } });
   const ratio = ratioName(shown.width, shown.height);
   const label = custom ? ratio : selected ? selected.label : isDefault ? "Default" : ratio;
-  const badge = tier === "2k" ? "2K" : custom ? "C" : "";
-  const what = `${label}, ${shown.width} × ${shown.height}${tier === "2k" ? ", 2K" : custom ? ", custom size" : ""}`;
+  // Megapixels: an MP tag, the way 2K says its size. The count is in the menu, its preview and the
+  // tip: as a tag it would change width with every step of a drag, under a button held at its width.
+  const mpTag = !custom && targetArea > 0 ? "MP" : "";
+  const badge = tier === "2k" ? "2K" : custom ? "C" : mpTag;
+  const what = `${label}, ${shown.width} × ${shown.height}${tier === "2k" ? ", 2K" : custom ? ", custom size" : mpTag ? `, ${formatMp(targetArea / MEGAPIXEL)} megapixels` : ""}`;
   /** The preview's caption for a row, or for the size chosen: "Name · ratio" where the name isn't the ratio itself. */
   const captionFor = (row: SizeRow | null) => row
     ? (row.small ? `${row.label} · ${row.small}` : row.label)
     : custom ? `${savedMatch ? savedMatch.name : "Custom"} · ${ratio}` : isDefault ? `Default · ${defaultOption?.label || ratio}` : label;
-  const note = tier === "2k" && plan.capped ? `This model goes up to ${sizeMax} px a side.`
+  const note = !modelNative ? ""
+    : (tier === "2k" || targetArea > 0) && plan.capped ? `This model goes up to ${plan.maxSide} px a side.`
     : tier === "2k" && plan.untested ? "This model isn’t known for 2K. Some pictures may repeat or warp."
+    : targetArea > 0 && plan.untested ? "This model isn’t known for sizes this large. Some pictures may repeat or warp."
     : "";
-  return { custom, picked, shown, rows, savedMatch, ownShape, isActive, savedRow, label, badge, what, captionFor, note };
+  return { custom, picked, shown, rows, savedMatch, ownSize, isActive, savedRow, label, badge, what, captionFor, note };
 }
 
 const tierLabels: Record<SizeTier, string> = { none: "Default", "2k": "2K", custom: "Custom" };
@@ -163,6 +178,59 @@ export function SizeTabs({ tiers, value, onChange }: { tiers: SizeTier[]; value:
   );
 }
 
+/**
+ * A label you drag sideways to change a number (W, H, MP), like a design tool. The drag
+ * changes the value and lets go: releasing doesn't put you in the field. A press that
+ * doesn't move is a click, which does. The drag ends however the pointer goes (up, cancel,
+ * capture lost, unmount), so the scrub cursor can't outlive it.
+ */
+function useScrub({ onStart, onScrub, input }: {
+  onStart: () => void;
+  /** Steps from where the drag began, one per 3px (Shift: four times as fast). */
+  onScrub: (steps: number) => void;
+  input: React.RefObject<HTMLInputElement | null>;
+}) {
+  const [dragging, setDragging] = React.useState(false);
+  const drag = React.useRef<{ x: number; moved: boolean } | null>(null);
+  const stopScrub = () => document.documentElement.classList.remove("is-size-scrubbing");
+  React.useEffect(() => () => { if (drag.current) stopScrub(); }, []);
+  const end = (click: boolean) => {
+    const current = drag.current;
+    if (!current) return;
+    drag.current = null;
+    setDragging(false);
+    stopScrub();
+    if (click && !current.moved) input.current?.focus();
+  };
+  const handlers = {
+    onPointerDown: (event: React.PointerEvent<HTMLSpanElement>) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      // A field being typed in settles first, so the drag starts from what it shows.
+      if (document.activeElement instanceof HTMLElement && document.activeElement.closest(".size-fields, .size-mp")) document.activeElement.blur();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      drag.current = { x: event.clientX, moved: false };
+      onStart();
+    },
+    onPointerMove: (event: React.PointerEvent<HTMLSpanElement>) => {
+      const current = drag.current;
+      if (!current) return;
+      // A few pixels of wobble is still a click.
+      if (!current.moved) {
+        if (Math.abs(event.clientX - current.x) < 3) return;
+        current.moved = true;
+        setDragging(true);
+        document.documentElement.classList.add("is-size-scrubbing");
+      }
+      onScrub(Math.round((event.clientX - current.x) / 3) * (event.shiftKey ? 4 : 1));
+    },
+    onPointerUp: () => end(true),
+    onPointerCancel: () => end(false),
+    onLostPointerCapture: () => end(false)
+  };
+  return { dragging, handlers };
+}
+
 /** One side's field: type, arrow keys, or drag its label sideways. */
 function SizeField({ axis, value, limits, onStart, onChange }: {
   axis: "W" | "H";
@@ -174,7 +242,6 @@ function SizeField({ axis, value, limits, onStart, onChange }: {
 }) {
   const [draft, setDraft] = React.useState(String(value));
   const [editing, setEditing] = React.useState(false);
-  const [dragging, setDragging] = React.useState(false);
   React.useEffect(() => { if (!editing) setDraft(String(value)); }, [value, editing]);
   const step = limits.step || 16;
   const snap = (next: number) => snapSide(next, limits, step);
@@ -185,36 +252,23 @@ function SizeField({ axis, value, limits, onStart, onChange }: {
     setDraft(String(next));
   };
 
-  const drag = React.useRef<{ x: number; value: number } | null>(null);
-  const onPointerDown = (event: React.PointerEvent<HTMLSpanElement>) => {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    drag.current = { x: event.clientX, value };
-    onStart();
-    setDragging(true);
-    document.documentElement.classList.add("is-size-scrubbing");
-  };
-  const onPointerMove = (event: React.PointerEvent<HTMLSpanElement>) => {
-    if (!drag.current) return;
-    // One step every 3px; Shift moves four times as fast.
-    const steps = Math.round((event.clientX - drag.current.x) / 3) * (event.shiftKey ? 4 : 1);
-    const next = snap(drag.current.value + steps * step);
-    if (next !== value) onChange(next);
-  };
-  const endDrag = () => {
-    drag.current = null;
-    setDragging(false);
-    document.documentElement.classList.remove("is-size-scrubbing");
-  };
+  const input = React.useRef<HTMLInputElement>(null);
+  const from = React.useRef(value);
+  const { dragging, handlers } = useScrub({
+    input,
+    onStart: () => { from.current = value; onStart(); },
+    onScrub: (steps) => { const next = snap(from.current + steps * step); if (next !== value) onChange(next); }
+  });
 
   const label = axis === "W" ? "Width" : "Height";
   return (
-    <label className={cn("size-field", dragging && "is-dragging")}>
+    // Not a <label>: a label's click would focus the field at the end of every drag.
+    <div className={cn("size-field", dragging && "is-dragging")} onClick={(event) => { if (event.target === event.currentTarget) input.current?.focus(); }}>
       <Tip content={`Drag to change the ${label.toLowerCase()}`}>
-        <span className="size-field-key" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={endDrag} onPointerCancel={endDrag} aria-hidden="true">{axis}</span>
+        <span className="size-field-key" {...handlers} aria-hidden="true">{axis}</span>
       </Tip>
       <input
+        ref={input}
         inputMode="numeric"
         aria-label={`${label} in pixels`}
         value={draft}
@@ -238,7 +292,90 @@ function SizeField({ axis, value, limits, onStart, onChange }: {
           }
         }}
       />
-    </label>
+    </div>
+  );
+}
+
+/** Megapixels in the size menu (Settings › Generation): the target, its limit, and how to change or clear it. */
+export type MegapixelControl = {
+  /** The count Default draws every shape at; null leaves each model at its own size. */
+  target: number | null;
+  max: number;
+  onChange: (value: number) => void;
+  onReset: () => void;
+};
+const MIN_MP = 0.25;
+
+/**
+ * The size menu's Megapixels, under the shapes: how big every shape is drawn. Type it, step
+ * it with the arrow keys (Shift: whole megapixels) or drag its MP label. In Default it scales
+ * every shape; in Custom, the size you have, keeping its shape. Reset hands each model back
+ * its own size.
+ */
+export function MegapixelField({ current, control, custom }: {
+  /** The megapixels of the size on screen. */
+  current: number;
+  control: MegapixelControl;
+  custom: boolean;
+}) {
+  const set = !custom && control.target !== null;
+  const value = set ? control.target! : current;
+  const clamp = (next: number) => Math.min(control.max, Math.max(MIN_MP, Math.round(next * 20) / 20));
+  const [draft, setDraft] = React.useState(formatMp(value));
+  const [editing, setEditing] = React.useState(false);
+  React.useEffect(() => { if (!editing) setDraft(formatMp(value)); }, [value, editing]);
+  // What the field showed when focused: leaving it unchanged sets nothing (the rounded "0.98" of
+  // a 0.984 MP shape would otherwise become a 1 MP target nobody typed).
+  const shownAtFocus = React.useRef("");
+  const typedValue = () => {
+    const typed = Number(draft.replace(",", "."));
+    return draft !== shownAtFocus.current && typed > 0 ? clamp(typed) : null;
+  };
+  const commit = () => {
+    const next = typedValue();
+    if (next !== null && next !== value) control.onChange(next);
+    setDraft(formatMp(next ?? value));
+    shownAtFocus.current = formatMp(next ?? value);
+  };
+  const input = React.useRef<HTMLInputElement>(null);
+  const from = React.useRef(value);
+  const { dragging, handlers } = useScrub({
+    input,
+    // From what's typed, if anything: the drag's press commits it, but this render's value is from before.
+    onStart: () => { from.current = (editing ? typedValue() : null) ?? value; },
+    // A twentieth of a megapixel a step.
+    onScrub: (steps) => { const next = clamp(from.current + steps * 0.05); if (next !== value) control.onChange(next); }
+  });
+  return (
+    <div className="size-mp">
+      <span className="size-mp-label">
+        Megapixels
+        {set ? <button type="button" className="size-mp-reset" onClick={control.onReset}>Reset</button> : <small>{custom ? "this size" : "as the model draws"}</small>}
+      </span>
+      <div className={cn("size-field size-mp-field", dragging && "is-dragging")} onClick={(event) => { if (event.target === event.currentTarget) input.current?.focus(); }}>
+        <input
+          ref={input}
+          inputMode="decimal"
+          aria-label="Megapixels"
+          value={draft}
+          onFocus={(event) => { shownAtFocus.current = draft; setEditing(true); event.currentTarget.select(); }}
+          onBlur={() => { setEditing(false); commit(); }}
+          onChange={(event) => setDraft(event.target.value.replace(/[^0-9.,]/g, "").slice(0, 5))}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") { event.preventDefault(); commit(); event.currentTarget.select(); }
+            if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+              event.preventDefault();
+              const next = clamp(value + (event.key === "ArrowUp" ? 1 : -1) * (event.shiftKey ? 1 : 0.1));
+              setDraft(formatMp(next));
+              if (next !== value) control.onChange(next);
+            }
+          }}
+        />
+        <Tip content="Drag to change the megapixels">
+          <span className="size-field-key" {...handlers} aria-hidden="true">MP</span>
+        </Tip>
+      </div>
+    </div>
   );
 }
 
@@ -365,7 +502,8 @@ export function SavedSizeRow({ saved, active, onPick, onRename, onRemove, onPrev
             onClick={onPick}
           >
             <span className="aspect-shape" style={aspectIconStyle(shape)} />
-            <span>{saved.name}<small>{ratio}</small></span>
+            {/* The name gives way ("…"), the ratio stays: a long name never runs under the size. */}
+            <span className="size-saved-label" title={saved.name}><span>{saved.name}</span><small>{ratio}</small></span>
             <em>{saved.width}×{saved.height}</em>
           </button>
         )}

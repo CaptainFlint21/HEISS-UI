@@ -19,8 +19,8 @@ import { progressLine, progressReading, RunLeft } from './GenerationProgress';
 import { RestartEtaText } from './ComfyRestart';
 import { estimatePhrase } from './useGenerationEstimate';
 import type { GalleryItem, Profile, SavedSize } from './types';
-import { LinkedSizeFields, SizePreview, SizeTabs, sizeMenuModel, type SizeRow, type SizeTier } from './SizeMenu';
-import { presetRatio, ratioName } from './sizing';
+import { LinkedSizeFields, MegapixelField, SizePreview, SizeTabs, sizeMenuModel, type SizeRow, type SizeTier } from './SizeMenu';
+import { MEGAPIXEL, presetRatio, ratioName } from './sizing';
 import type { ShowToast } from './toast';
 import { PromptHistorySheet } from './PromptHistory';
 import { PhoneSearchBar } from './GallerySearch';
@@ -406,7 +406,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   const [searchOpen, setSearchOpen] = React.useState(false);
   const restarting = Boolean(comfyStatus?.restarting);
   const connected = Boolean(comfyStatus?.connected);
-  const statusText = restarting ? 'ComfyUI is restarting' : connected ? `ComfyUI connected${comfyStatus?.device ? ` · ${comfyStatus.device}` : ''}` : comfyStatus?.checked ? 'ComfyUI is offline' : 'Checking ComfyUI…';
+  const statusText = restarting ? 'ComfyUI is restarting' : comfyStatus?.busy ? 'ComfyUI is busy' : connected ? `ComfyUI connected${comfyStatus?.device ? ` · ${comfyStatus.device}` : ''}` : comfyStatus?.checked ? 'ComfyUI is offline' : 'Checking ComfyUI…';
   const workflowName = currentProfile?.displayName || currentProfile?.label || 'Choose a model';
   const quickGo = Boolean(prompt.trim()) && !generateDisabled && !comfyOffline && !restarting;
 
@@ -540,9 +540,11 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
     aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, mode, count, countMeta, setCount, steps, stepsMeta, setSteps,
     referenceInputs, referenceInpaint, referenceRole, referenceAssets, selectReferenceAsset, removeReferenceAsset, confirmAction, showToast,
     generate, generateDisabled, generateDisabledReason, comfyStatus, retryComfyStatus, comfyRetrying, seed, setSeed, loraActiveCount, phoneAdvancedControls, generationEstimate,
-    customSize, sizeTier, sizeMax, customLimits, savedSizes, promptEnhance
+    customSize, sizeTier, sizeMax, customLimits, savedSizes, sizeArea, sizeTiers, promptEnhance
   } = view;
   const enhance = promptEnhance as PromptEnhance | null;
+  // Several references: Edit and Ref say what happens to all of them, not only the first.
+  const many = (referenceAssets || []).length > 1;
   const [sheet, setSheet] = React.useState<'' | 'workflow' | 'size' | 'advanced'>('');
   const [showNegative, setShowNegative] = React.useState(Boolean(negative));
   const [historyOpen, setHistoryOpen] = React.useState(false);
@@ -553,7 +555,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
   const { min: stepMin, max: stepMax, recommended: stepDefault } = practicalStepRange(currentProfile, stepsMeta, steps);
   // The size row reads like the desktop's size button: the shape, its name, the size it makes.
   const tier: SizeTier = customSize ? 'custom' : sizeTier || 'none';
-  const size = sizeMenuModel({ value: aspectPickerValue, options: aspectOptions || [], currentSize: aspectValue, defaultSize: defaultAspectSize, tier, native: currentProfile?.native, sizeMax, limits: customLimits, savedSizes });
+  const size = sizeMenuModel({ value: aspectPickerValue, options: aspectOptions || [], currentSize: aspectValue, defaultSize: defaultAspectSize, tier, native: currentProfile?.native, sizeMax, limits: customLimits, savedSizes, targetArea: sizeArea || 0, offerTwoK: Boolean(sizeTiers?.includes('2k')) });
   // A long run says so before it starts; a quick one needs no warning.
   const estimate = generationEstimate?.ms && generationEstimate.ms >= 45_000 ? `Takes ${estimatePhrase(generationEstimate)}.` : '';
   const reason = restarting ? <>ComfyUI is restarting. <RestartEtaText fallback="Back in a few seconds." /></> : comfyOffline ? 'ComfyUI is offline.' : !prompt.trim() ? '' : generateDisabled ? generateDisabledReason : estimate;
@@ -603,19 +605,23 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
           confirmDelete={(asset) => confirmAction({ title: `Delete ${asset.name}?`, description: 'It’s removed from uploads.', action: 'Delete', destructive: true })}
           onError={(message) => showToast(message, 'error')}
         />
-        {/* Edit or Ref, in plain sight: on a phone there's no hover to open the chip's menu, and no tooltip to say what each does. */}
+        {/* Edit or Reference, in plain sight: on a phone there's no hover to open the chip's menu, and no tooltip to say what each does. */}
         <AnimatePresence initial={false}>
           {referenceRole ? (
             <motion.div key="role" className="phone-ref-role" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
-              <div className={cn('ref-menu-role', referenceRole.value === 'reference' && 'is-ref')} role="radiogroup" aria-label="What this image is">
+              <div className={cn('ref-menu-role', referenceRole.value === 'reference' && 'is-ref', referenceRole.locked && 'is-locked')} role="radiogroup" aria-label="What this image is">
                 <i aria-hidden="true" />
                 {(['edit', 'reference'] as const).map((value) => (
-                  <button key={value} type="button" role="radio" aria-checked={referenceRole.value === value} className={cn(referenceRole.value === value && 'is-active')} onClick={() => { haptic('tap'); referenceRole.onChange(value); }}>
-                    {value === 'edit' ? 'Edit' : 'Ref'}<HapticTarget />
+                  // A painted mask settles it as Edit: Reference stays, unavailable, and the line says why.
+                  <button key={value} type="button" role="radio" aria-checked={referenceRole.value === value} aria-disabled={(referenceRole.locked && value === 'reference') || undefined} className={cn(referenceRole.value === value && 'is-active')} onClick={() => { if (referenceRole.locked && value === 'reference') { haptic('warning'); return; } haptic('tap'); referenceRole.onChange(value); }}>
+                    {value === 'edit' ? 'Edit' : 'Reference'}<HapticTarget />
                   </button>
                 ))}
               </div>
-              <small key={referenceRole.value}>{referenceRole.value === 'edit' ? 'Changes this picture, at its size and framing' : 'Guides a new picture, at the size you pick'}</small>
+              <small key={`${referenceRole.value}:${many}:${Boolean(referenceRole.locked)}`}>{referenceRole.locked ? 'The painted part changes this picture. Clear the paint to use it as a reference'
+                : referenceRole.value === 'edit'
+                ? many ? 'Changes the first picture, at its size. The others are what it can draw from' : 'Changes this picture, at its size and framing'
+                : many ? 'They all guide a new picture, at the size you pick' : 'Guides a new picture, at the size you pick'}</small>
             </motion.div>
           ) : null}
         </AnimatePresence>
@@ -776,13 +782,14 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
 function SizeSheet({ view, open, onClose }: { view: Record<string, any>; open: boolean; onClose: () => void }) {
   const {
     aspectOptions, aspectPickerValue, aspectValue, defaultAspectSize, applyAspect, mode, currentProfile, customSize, sizeTier, sizeMax, customLimits,
-    chooseSizeTier, applyCustomRatio, setCustomDimensions, savedSizes, saveCustomSize, renameSavedSize, removeSavedSize, pickSavedSize
+    chooseSizeTier, applyCustomRatio, setCustomDimensions, savedSizes, saveCustomSize, renameSavedSize, removeSavedSize, pickSavedSize,
+    sizeTiers, sizeArea, megapixelControl
   } = view;
   const saved = (savedSizes || []) as SavedSize[];
   const tier: SizeTier = customSize ? 'custom' : sizeTier || 'none';
-  const tiers: SizeTier[] = mode === 'image' ? ['none', '2k', 'custom'] : ['none', 'custom'];
-  const model = sizeMenuModel({ value: aspectPickerValue, options: aspectOptions || [], currentSize: aspectValue, defaultSize: defaultAspectSize, tier, native: currentProfile?.native, sizeMax, limits: customLimits, savedSizes: saved });
-  const { custom, picked, shown, rows, savedMatch, ownShape, isActive, savedRow, captionFor, note } = model;
+  const tiers: SizeTier[] = sizeTiers || (mode === 'image' ? ['none', '2k', 'custom'] : ['none', 'custom']);
+  const model = sizeMenuModel({ value: aspectPickerValue, options: aspectOptions || [], currentSize: aspectValue, defaultSize: defaultAspectSize, tier, native: currentProfile?.native, sizeMax, limits: customLimits, savedSizes: saved, targetArea: sizeArea || 0, offerTwoK: tiers.includes('2k') });
+  const { custom, picked, shown, rows, savedMatch, ownSize, isActive, savedRow, captionFor, note } = model;
 
   // The row under a finger: shown on the stage after a beat, so a scroll that starts on a row doesn't flick the frame.
   const [pressed, setPressed] = React.useState<SizeRow | null>(null);
@@ -820,14 +827,14 @@ function SizeSheet({ view, open, onClose }: { view: Record<string, any>; open: b
   return (
     <Sheet open={open} onClose={onClose} title="Size" className="phone-size">
       <div className="phone-size-stage">
-        <SizePreview className="is-stage" size={stage} label={captionFor(pressed)} sub={`${stage.width} × ${stage.height}`} accent={!pressed && tier !== 'none'} inset={18} />
+        <SizePreview className="is-stage" size={stage} label={captionFor(pressed)} sub={`${stage.width} × ${stage.height}`} accent={!pressed && (tier !== 'none' || sizeArea > 0)} inset={18} />
       </div>
       <div className="phone-size-top">
         <SizeTabs tiers={tiers} value={tier} onChange={(next) => { haptic('tap'); chooseSizeTier(next); }} />
         <AnimatePresence initial={false}>
           {custom && customLimits ? (
             <motion.div key="custom" className="size-custom" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
-              <LinkedSizeFields size={picked} limits={customLimits} onChange={setCustomDimensions} onSave={ownShape || savedMatch ? () => { haptic('success'); saveCustomSize(); } : undefined} saved={Boolean(savedMatch)} />
+              <LinkedSizeFields size={picked} limits={customLimits} onChange={setCustomDimensions} onSave={ownSize || savedMatch ? () => { haptic('success'); saveCustomSize(); } : undefined} saved={Boolean(savedMatch)} />
             </motion.div>
           ) : null}
         </AnimatePresence>
@@ -842,6 +849,8 @@ function SizeSheet({ view, open, onClose }: { view: Record<string, any>; open: b
           </button>
         ))}
       </div>
+      {/* Under the shapes, as on the desktop: how big they're all drawn. */}
+      {megapixelControl ? <div className="phone-size-mp"><MegapixelField current={(shown.width * shown.height) / MEGAPIXEL} control={megapixelControl} custom={custom} /></div> : null}
       {saved.length ? (
         <>
           <div className="phone-size-saved-head">

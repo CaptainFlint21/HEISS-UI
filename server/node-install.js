@@ -68,37 +68,50 @@ export function packInstallPlan(pack, root = comfyRootDir(), platform = process.
   const requirements = paths.join(pack.folder, pack.requirements || "requirements.txt");
   const index = pack.pipIndex ? ` --extra-index-url ${pack.pipIndex}` : "";
   const folder = customNodes || paths.join("ComfyUI", "custom_nodes");
-  const clone = `git clone ${pack.repository}`;
+  // A pack inside a bigger repository (pack.subdir) is cloned next to its folder,
+  // and only its own folder is copied into place.
+  const source = pack.subdir ? `${pack.folder}.src` : pack.folder;
+  const clone = `git clone ${pack.repository}${pack.subdir ? ` ${source}` : ""}`;
   // Git in the pack's folder trusts it for this one command: on a drive that records no owner (exFAT, a
   // share, some Windows data drives) git otherwise stops with "dubious ownership". Quoted so sh doesn't glob.
-  const inPack = `git -c "safe.directory=*" -C ${pack.folder}`;
+  const inPack = `git -c "safe.directory=*" -C ${source}`;
   // The reviewed commit (node-packs.js), the same one the one-click install takes.
   const checkout = pack.commit ? `${inPack} checkout --detach ${pack.commit}` : "";
+  const subdir = pack.subdir ? paths.join(source, ...pack.subdir.split("/")) : "";
+  const place = (copy, remove) => (pack.subdir ? [copy, remove] : []);
   // A pack that moves with HEISS (`update`) is brought to its reviewed commit when an older copy is there.
-  const update = cloned && pack.update && checkout ? [`${inPack} fetch origin`, checkout] : [];
+  // Only a pack that is its own clone: a subdir pack's folder is a copy, with no git history to fetch into.
+  const moves = Boolean(pack.update && checkout && !pack.subdir);
+  const update = cloned && moves ? [`${inPack} fetch origin`, checkout] : [];
   // A pack that moves with HEISS, on a computer HEISS can't look into (ComfyUI elsewhere): one command that works
   // whether an older copy is there or not, cloning only when it isn't, then bringing it to the reviewed commit.
-  const either = !cloned && pack.update && checkout;
+  const either = !cloned && moves;
   const ensure = {
     sh: `{ [ -d "${pack.folder}" ] || ${clone}; }`,
     powershell: `if (-not (Test-Path -LiteralPath "${pack.folder}")) { ${clone} }`,
     cmd: `(if not exist "${pack.folder}" ${clone})`
   };
-  const fetchFor = (shell) => (either ? [ensure[shell], `${inPack} fetch origin`, checkout] : cloned ? update : [clone, ...(checkout ? [checkout] : [])]);
-  const fetchSteps = fetchFor("sh");
+  const fetchFor = (shell, copy, remove) => (either ? [ensure[shell], `${inPack} fetch origin`, checkout] : cloned ? update : [clone, ...(checkout ? [checkout] : []), ...place(copy, remove)]);
+  const pipNeeded = pack.requirements !== false;
   const commands = [];
   if (win) {
     const exe = python ? `"${python}"` : "python";
     const embedded = isEmbeddedPython(python);
     const pip = `${exe} ${pipArgs(python).join(" ")} install -r ${requirements}${index}`;
     // -LiteralPath: a plain Set-Location reads [ ] in a folder name as wildcards.
-    const steps = [`Set-Location -LiteralPath "${folder}"`, ...fetchFor("powershell"), ...(embedded ? ['$env:PYTHONNOUSERSITE = "1"'] : []), `${python ? "& " : ""}${pip}`];
+    const steps = [`Set-Location -LiteralPath "${folder}"`,
+      ...fetchFor("powershell", `Copy-Item -Recurse -LiteralPath "${subdir}" -Destination "${pack.folder}"`, `Remove-Item -Recurse -Force -LiteralPath "${source}"`),
+      ...(pipNeeded ? [...(embedded ? ['$env:PYTHONNOUSERSITE = "1"'] : []), `${python ? "& " : ""}${pip}`] : [])];
     commands.push({ shell: "powershell", label: "PowerShell", command: steps.map((step, i) => (i ? `if ($?) { ${step} }` : step)).join("; ") });
     // Quoted whole, or cmd keeps the space before && in the value.
-    commands.push({ shell: "cmd", label: "Command Prompt", command: [`cd /d "${folder}"`, ...fetchFor("cmd"), ...(embedded ? ['set "PYTHONNOUSERSITE=1"'] : []), pip].join(" && ") });
+    commands.push({ shell: "cmd", label: "Command Prompt", command: [`cd /d "${folder}"`,
+      ...fetchFor("cmd", `xcopy /E /I /Q "${subdir}" "${pack.folder}"`, `rmdir /S /Q "${source}"`),
+      ...(pipNeeded ? [...(embedded ? ['set "PYTHONNOUSERSITE=1"'] : []), pip] : [])].join(" && ") });
   } else {
     const exe = python ? `"${python}"` : "python3";
-    commands.push({ shell: "sh", label: "Terminal", command: [`cd "${folder}"`, ...fetchSteps, `${exe} -m pip install -r ${requirements}${index}`].join(" && ") });
+    commands.push({ shell: "sh", label: "Terminal", command: [`cd "${folder}"`,
+      ...fetchFor("sh", `cp -R "${subdir}" "${pack.folder}"`, `rm -rf "${source}"`),
+      ...(pipNeeded ? [`${exe} -m pip install -r ${requirements}${index}`] : [])].join(" && ") });
   }
   return {
     exact: Boolean(customNodes && python),
@@ -124,7 +137,7 @@ export function missingPackPart(info, packId, { detail = "", extra = [] } = {}) 
     detail: detail || `ComfyUI needs the ${pack.name} custom nodes for this.`,
     downloads: [],
     missingNodes: absent,
-    nodePack: { id: pack.id, name: pack.name, repository: pack.repository, folder: pack.folder, search: pack.search || "", note: pack.note || "" },
+    nodePack: { id: pack.id, name: pack.name, repository: pack.repository, folder: pack.folder, search: pack.search || "", note: pack.note || "", ...(pack.subdir ? { subdir: pack.subdir } : {}) },
     install: packInstallPlan(pack),
     autoInstall: packInstallRoutes(pack.id)
   };

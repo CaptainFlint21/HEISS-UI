@@ -48,6 +48,7 @@ import { Toaster } from './Toaster';
 import { EmptyStage } from './EmptyStage';
 import { SettingsDialog, type SettingsSection } from './SettingsDialog';
 import { GetModelsSheet, StarterModels } from './StarterModels';
+import { FamilySetupDialog, useFamilySetupRequests } from './FamilySetupDialog';
 import { NoComfySheet } from './NoComfySheet';
 import { FeedbackHost } from './FeedbackDialog';
 import { ShortcutsSheet } from './shortcuts';
@@ -100,6 +101,7 @@ const ZenStrip = memoLatest(function ZenStrip({ items, activeId, stripRef, onPoi
 function comfyStatusLabel(status: any) {
   if (status?.restarting) return "ComfyUI is restarting…";
   if (status?.checking) return "Checking ComfyUI…";
+  if (status?.busy) return `ComfyUI is busy${status.device ? ` · ${status.device}` : ""} · slow to answer, runs carry on`;
   if (status?.connected) {
     const detail = [status.device, status.latencyMs ? `${status.latencyMs}ms` : "", status.version ? `v${status.version}` : ""].filter(Boolean).join(" · ");
     return `ComfyUI connected${detail ? ` · ${detail}` : ""}`;
@@ -317,6 +319,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const [noComfyOpen, setNoComfyOpen] = React.useState(false);
   const [getModelsOpen, setGetModelsOpen] = React.useState(false);
   const openGetModels = React.useCallback(() => setGetModelsOpen(true), []);
+  // A guided setup (MOSS-Image), opened from a model's setup panel.
+  const [familySetup, setFamilySetup] = React.useState({ family: "", profileId: "" });
+  const [familySetupOpen, setFamilySetupOpen] = React.useState(false);
+  useFamilySetupRequests((request) => { setFamilySetup(request); setFamilySetupOpen(true); });
   const [shortcutsOpen, setShortcutsOpen] = React.useState(false);
   // "?" anywhere outside a field lists the keyboard shortcuts.
   React.useEffect(() => {
@@ -699,6 +705,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               defaultAspectSize={defaultAspectSize}
               applyAspect={applyAspect}
               sizeTier={customSize ? "custom" : view.sizeTier}
+              sizeTiers={view.sizeTiers}
+              sizeArea={view.sizeArea}
+              megapixelControl={view.megapixelControl}
               sizeMax={view.sizeMax}
               customLimits={view.customLimits}
               chooseSizeTier={view.chooseSizeTier}
@@ -834,6 +843,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               defaultAspectSize={defaultAspectSize}
               applyAspect={applyAspect}
               sizeTier={customSize ? "custom" : view.sizeTier}
+              sizeTiers={view.sizeTiers}
+              sizeArea={view.sizeArea}
+              megapixelControl={view.megapixelControl}
               sizeMax={view.sizeMax}
               customLimits={view.customLimits}
               chooseSizeTier={view.chooseSizeTier}
@@ -903,6 +915,18 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       <SettingsDialog view={view} open={Boolean(settings)} section={settingsSection} onSectionChange={setSettingsSection} onClose={() => setSettings(false)} onGetModels={thisComputer ? () => { setSettings(false); openGetModels(); } : undefined} />
       <NoComfySheet open={noComfyOpen} onOpenChange={setNoComfyOpen} onChangeAddress={thisComputer ? () => openSettings("connection") : undefined} />
       <GetModelsSheet open={getModelsOpen} onOpenChange={setGetModelsOpen} showToast={showToast} onStarted={view.onStarterStarted} onUse={view.selectStarterModel} onFindModels={thisComputer ? modelFolders?.openDialog : undefined} />
+      {familySetup.family ? (
+        <FamilySetupDialog
+          family={familySetup.family}
+          profileId={familySetup.profileId}
+          open={familySetupOpen}
+          onOpenChange={setFamilySetupOpen}
+          showToast={showToast}
+          onUse={view.pickModel}
+          onChanged={() => { view.refreshModels(false); view.refreshWorkflows(); }}
+          comfyUrl={health?.comfyUrl}
+        />
+      ) : null}
       <ShortcutsSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       <FeedbackHost />
       {modelFolders ? <ModelFoldersDialog folders={modelFolders} runningCount={runningCount} /> : null}
