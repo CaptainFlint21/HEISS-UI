@@ -11,6 +11,16 @@ version opens with a `> ` summary line, which the update pill shows.
 
 ## [Unreleased]
 
+> Your size stays when you switch models, and a Prompt enhancer switch
+
+### Changed
+- **Your size stays when you switch models.** A shape you picked, like 16:9,
+  stays when you change models instead of going back to square. Each model
+  draws it at its own size.
+- **Prompt enhancer switch.** With FLUX.3 Klein selected, Basics has a switch
+  for its prompt enhancer. Turn it off to have your prompt used exactly as
+  written. Try again repeats a run the way it was made.
+
 ## [0.18.0] - 2026-10-17
 
 > Native 2K, a new size menu, FLUX.3 Klein and MOSS-Image
