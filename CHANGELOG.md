@@ -11,13 +11,14 @@ version opens with a `> ` summary line, which the update pill shows.
 
 ## [Unreleased]
 
-> Sizes stay across models, and a Prompt enhancer switch
+> Bug fixes and a FLUX.3 prompt enhancer switch
 
-### Changed
-- **Your shape stays when you switch models.** Pick 16:9 and the next model
-  draws 16:9 too, at its own size for it. Default stays Default.
-- **Prompt enhancer switch.** With FLUX.3 Klein selected, Basics has a switch
-  for its prompt enhancer. Turn it off to use your prompt exactly as written.
+### Added
+- **FLUX.3 prompt enhancer switch** in the sidebar's Basics. Turn it off to
+  send your prompt as written.
+
+### Fixed
+- Switching models no longer resets the size to square.
 
 ## [0.18.0] - 2026-10-17
 
