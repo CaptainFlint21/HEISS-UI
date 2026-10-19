@@ -11,6 +11,8 @@ version opens with a `> ` summary line, which the update pill shows.
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-10-19
+
 > Bug fixes and a FLUX.3 prompt enhancer switch
 
 ### Added
@@ -1155,7 +1157,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/tristmeister/HEISS-UI/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/tristmeister/HEISS-UI/compare/v0.18.1...HEAD
+[0.18.1]: https://github.com/tristmeister/HEISS-UI/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.15.0...v0.16.0
