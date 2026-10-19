@@ -164,6 +164,7 @@ export function useGenerationActions(view: any) {
         frames,
         fps,
         autoResizeInputs: prefs.autoResizeInputs !== false,
+        promptUpsampler: prefs.promptEnhancer !== false,
         loras,
         referenceAssets: (referenceAssets || []).map(({ slot, asset }: any) => ({ slot, assetId: asset.id })),
         referenceRole: framedByReference ? "edit" : "reference",

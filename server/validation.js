@@ -137,7 +137,8 @@ function sanitizeFamilyBody(input, info, stats) {
     // A runner that loads a whole model folder takes it by its full path (resolved when the profile was built).
     modelPath: profile.modelPath || "",
     clipVision: profile.clipVision || "",
-    upsampler: profile.upsampler || "",
+    // Off when the person turned the Prompt enhancer off: the prompt goes to the encoder as written.
+    upsampler: input.promptUpsampler === false ? "" : profile.upsampler || "",
     vpredPatch: profile.vpredPatch,
     krea2Enhancer: profile.family === "krea2" && Boolean(info["ComfyUI-Krea2T-Enhancer"]),
     sana: profile.sana || null,
@@ -160,6 +161,7 @@ function sanitizeFamilyBody(input, info, stats) {
     startImageName: String(input.startImageName || ""),
     referenceAssets,
     autoResizeInputs: input.autoResizeInputs !== false,
+    promptUpsampler: input.promptUpsampler !== false,
     inpaint: sanitizeInpaint(input, profile, referenceAssets),
     // "reference": the first reference guides the picture but doesn't frame it; the picked size does.
     // A painted mask is an edit of that image, so it keeps the image's framing.

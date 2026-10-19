@@ -11,6 +11,15 @@ version opens with a `> ` summary line, which the update pill shows.
 
 ## [Unreleased]
 
+> Bug fixes and a FLUX.3 prompt enhancer switch
+
+### Added
+- **FLUX.3 prompt enhancer switch** in the sidebar's Basics. Turn it off to
+  send your prompt as written.
+
+### Fixed
+- Switching models no longer resets the size to square.
+
 ## [0.18.0] - 2026-10-17
 
 > Native 2K, a new size menu, FLUX.3 Klein and MOSS-Image
