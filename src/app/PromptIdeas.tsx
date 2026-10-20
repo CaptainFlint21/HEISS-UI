@@ -18,9 +18,9 @@ export function PromptIdeas({ prompts, onPick, onSurprise }: { prompts: string[]
   return (
     <div className="prompt-ideas" role="group" aria-label={t("Prompts to start from")} style={{ '--n': prompts.length } as React.CSSProperties}>
       {prompts.map((text, index) => (
-        <Tip key={text} content={text} side="top">
+        <Tip key={text} content={t(text)} side="top">
           <button type="button" className="prompt-idea" style={{ '--i': index } as React.CSSProperties} onClick={() => onPick(text)}>
-            <span>{shortLabel(text)}</span>
+            <span>{shortLabel(t(text))}</span>
           </button>
         </Tip>
       ))}
