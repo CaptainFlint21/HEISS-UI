@@ -1,5 +1,10 @@
 /** Russian interface catalog. Keys are the English source messages. */
 export const ru = Object.freeze({
+  "Loading models…": "Загрузка моделей…",
+  "Choose a model": "Выберите модель",
+  "This model needs files first": "Сначала скачайте файлы для этой модели",
+  "Needs {0}": "Необходимые компоненты: {0}",
+  "{0} is required": "Необходимо: {0}",
   "A fisherman mending nets on a quiet harbour at dawn, soft mist over the water, film photograph": "Рыбак чинит сети в тихой гавани на рассвете, лёгкий туман над водой, плёночная фотография",
   "Close portrait of an old woman laughing in warm window light, freckles and fine lines, natural colour": "Крупный портрет смеющейся пожилой женщины в тёплом свете из окна, веснушки и мелкие морщины, естественные цвета",
   "A small bakery on a rainy Paris street at night, glowing windows reflected in wet cobblestones": "Маленькая пекарня на дождливой парижской улице ночью, свет окон отражается на мокрой брусчатке",

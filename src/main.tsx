@@ -1510,10 +1510,10 @@ function App() {
   const modelSetupMissing = Boolean(currentProfile && (currentProfile.ready === false
     || (!currentProfile.encoderSlots && ((currentProfile.capabilities.textEncoder && !textEncoder) || (currentProfile.capabilities.vae && !vae)))));
   const generateDisabled = !currentProfile || modelSetupMissing || missingRequiredReference;
-  const generateDisabledReason = missingRequiredReference ? `${missingReferenceInput?.label || "Reference image"} is required`
-    : modelMissingParts.length ? `Needs ${modelMissingParts.map((item) => item.label).join(", ")}`
-    : modelSetupMissing ? "This model needs files first"
-    : !currentProfile ? (models ? "Choose a model" : "Loading models…") : undefined;
+  const generateDisabledReason = missingRequiredReference ? t('{0} is required', { 0: t(missingReferenceInput?.label || "Reference image") })
+    : modelMissingParts.length ? t('Needs {0}', { 0: modelMissingParts.map((item) => item.label).join(", ") })
+    : modelSetupMissing ? t("This model needs files first")
+    : !currentProfile ? (models ? t("Choose a model") : t("Loading models…")) : undefined;
   const loraActiveCount = currentProfile?.capabilities.lora ? loras.filter((item) => item.enabled && item.name).length : 0;
   // Active LoRAs whose files clearly say another model family (lora-info.js): a quiet note above the prompt bar.
   const loraOptionNames = useMemo(() => ((currentProfile?.options?.loras || models?.loras || []) as unknown[]).map((option) => typeof option === "string" ? option : String((option as { name?: string })?.name || "")).filter(Boolean), [currentProfile, models]);
